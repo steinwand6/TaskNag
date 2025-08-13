@@ -8,11 +8,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   isLoading: false,
   error: null,
   
-  // Load tasks from backend
+  // Load root tasks from backend (tasks without parent)
   loadTasks: async () => {
     set({ isLoading: true, error: null });
     try {
-      const tasks = await TaskService.getTasks();
+      const tasks = await TaskService.getRootTasks();
       // Convert date strings to Date objects
       const parsedTasks = tasks.map(task => ({
         ...task,
@@ -48,10 +48,15 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         completedAt: newTask.completedAt ? new Date(newTask.completedAt) : undefined,
         dueDate: newTask.dueDate ? new Date(newTask.dueDate) : undefined,
       };
-      set((state) => ({
-        tasks: [...state.tasks, parsedTask],
-        isLoading: false
-      }));
+      // Only add to the main task list if it's a root task (no parent)
+      if (!parsedTask.parentId) {
+        set((state) => ({
+          tasks: [...state.tasks, parsedTask],
+          isLoading: false
+        }));
+      } else {
+        set({ isLoading: false });
+      }
       // Update system tray title
       TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {

@@ -14,6 +14,13 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // ローカルでの進捗率計算
+  const calculateProgress = (childTasks: Task[]) => {
+    if (childTasks.length === 0) return 0;
+    const completedCount = childTasks.filter(child => child.status === 'done').length;
+    return Math.round((completedCount / childTasks.length) * 100);
+  };
+
   const loadChildren = async () => {
     if (!parentTask.id) return;
     
@@ -34,28 +41,32 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
     }
   }, [isExpanded, parentTask.id]);
 
-  const handleProgressUpdate = async (taskId: string, progress: number) => {
+  const handleDelete = async (taskId: string) => {
+    if (!confirm('この子タスクを削除しますか？')) return;
+    
     try {
-      const updatedTask = await TaskService.updateProgress(taskId, progress);
+      await TaskService.deleteTask(taskId);
       
-      // 子タスクリストを更新
-      setChildren(prev => 
-        prev.map(child => 
-          child.id === taskId ? updatedTask : child
-        )
-      );
+      // 子タスクリストから削除
+      const updatedChildren = children.filter(child => child.id !== taskId);
+      setChildren(updatedChildren);
       
-      // 親タスクの進捗率を再計算
-      if (parentTask.id) {
-        await TaskService.calculateAndUpdateProgress(parentTask.id);
-        // 親タスクの更新を通知
-        if (onTaskUpdate) {
-          const updatedParent = await TaskService.getTaskById(parentTask.id);
-          onTaskUpdate(updatedParent);
+      // 親タスクの進捗率を即座に更新
+      if (onTaskUpdate) {
+        const newProgress = calculateProgress(updatedChildren);
+        onTaskUpdate({
+          ...parentTask,
+          progress: newProgress
+        });
+        
+        // バックエンドでも更新（非同期）
+        if (parentTask.id) {
+          TaskService.calculateAndUpdateProgress(parentTask.id).catch(console.error);
         }
       }
     } catch (error) {
-      console.error('Failed to update progress:', error);
+      console.error('Failed to delete subtask:', error);
+      alert('子タスクの削除に失敗しました');
     }
   };
 
@@ -74,14 +85,20 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
       });
 
       // 子タスクリストを更新
-      setChildren(prev => [...prev, newSubtask]);
+      const updatedChildren = [...children, newSubtask];
+      setChildren(updatedChildren);
       
-      // 親タスクの進捗率を再計算
-      if (parentTask.id) {
-        await TaskService.calculateAndUpdateProgress(parentTask.id);
-        if (onTaskUpdate) {
-          const updatedParent = await TaskService.getTaskById(parentTask.id);
-          onTaskUpdate(updatedParent);
+      // 親タスクの進捗率を即座に更新
+      if (onTaskUpdate) {
+        const newProgress = calculateProgress(updatedChildren);
+        onTaskUpdate({
+          ...parentTask,
+          progress: newProgress
+        });
+        
+        // バックエンドでも更新（非同期）
+        if (parentTask.id) {
+          TaskService.calculateAndUpdateProgress(parentTask.id).catch(console.error);
         }
       }
     } catch (error) {
@@ -90,23 +107,34 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
     }
   };
 
-  const handleStatusChange = async (taskId: string, newStatus: string) => {
+  const handleStatusChange = async (taskId: string, isDone: boolean) => {
     try {
+      const newStatus = isDone ? 'done' : 'todo';
       const updatedTask = await TaskService.moveTask(taskId, newStatus as any);
       
-      // ステータス変更時に進捗率も自動更新
-      if (newStatus === 'done') {
-        await handleProgressUpdate(taskId, 100);
-      } else if (parentTask.status === 'done' && newStatus !== 'done') {
-        await handleProgressUpdate(taskId, 0);
-      }
+      // ステータス変更時に進捗率も自動更新（100% or 0%）
+      await TaskService.updateProgress(taskId, isDone ? 100 : 0);
       
       // 子タスクリストを更新
-      setChildren(prev => 
-        prev.map(child => 
-          child.id === taskId ? updatedTask : child
-        )
+      const updatedChildren = children.map(child => 
+        child.id === taskId ? { ...updatedTask, progress: isDone ? 100 : 0 } : child
       );
+      setChildren(updatedChildren);
+      
+      // 親タスクの進捗率を即座に更新
+      if (onTaskUpdate) {
+        const newProgress = calculateProgress(updatedChildren);
+        console.log('SubTaskList handleStatusChange: Updating parent progress to:', newProgress, 'from children:', updatedChildren.map(c => ({id: c.id, status: c.status})));
+        onTaskUpdate({
+          ...parentTask,
+          progress: newProgress
+        });
+        
+        // バックエンドでも更新（非同期）
+        if (parentTask.id) {
+          TaskService.calculateAndUpdateProgress(parentTask.id).catch(console.error);
+        }
+      }
     } catch (error) {
       console.error('Failed to update task status:', error);
     }
@@ -165,44 +193,37 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
             <div className="text-sm text-gray-500">子タスクはありません</div>
           ) : (
             children.map(child => (
-              <div key={child.id} className="bg-gray-50 rounded p-3 space-y-2">
-                <div className="flex items-center justify-between">
+              <div key={child.id} className="bg-gray-50 rounded p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <input
+                    type="checkbox"
+                    checked={child.status === 'done'}
+                    onChange={(e) => handleStatusChange(child.id, e.target.checked)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
                   <div className="flex-1">
-                    <h4 className="font-medium text-sm">{child.title}</h4>
+                    <h4 className={`font-medium text-sm ${
+                      child.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900'
+                    }`}>
+                      {child.title}
+                    </h4>
                     {child.description && (
                       <p className="text-xs text-gray-600 mt-1">{child.description}</p>
                     )}
                   </div>
-                  
-                  <select
-                    value={child.status}
-                    onChange={(e) => handleStatusChange(child.id, e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-xs border rounded px-2 py-1"
-                  >
-                    <option value="inbox">Inbox</option>
-                    <option value="todo">Todo</option>
-                    <option value="in_progress">進行中</option>
-                    <option value="done">完了</option>
-                  </select>
                 </div>
                 
-                {/* 子タスクの進捗率コントロール */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">進捗:</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={child.progress || 0}
-                    onChange={(e) => handleProgressUpdate(child.id, parseInt(e.target.value))}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex-1"
-                  />
-                  <span className="text-xs text-gray-600 min-w-[3rem]">
-                    {child.progress || 0}%
-                  </span>
-                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(child.id);
+                  }}
+                  className="text-red-500 hover:text-red-700 text-sm ml-2"
+                  title="削除"
+                >
+                  ×
+                </button>
               </div>
             ))
           )}

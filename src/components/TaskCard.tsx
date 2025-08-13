@@ -1,8 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Task, TaskStatus } from '../types/Task';
 import { useTaskStore } from '../stores/taskStore';
 import { EditTaskModal } from './EditTaskModal';
-import { SubTaskList } from './SubTaskList';
 
 interface TaskCardProps {
   task: Task;
@@ -16,6 +16,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDragEnd 
 }) => {
   const { deleteTask, moveTask } = useTaskStore();
+  const navigate = useNavigate();
   const [editTask, setEditTask] = React.useState<Task | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   
@@ -39,6 +40,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   const handleDoubleClick = () => {
     setEditTask(task);
+  };
+
+  const handleRightClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(`/task/${task.id}`);
+  };
+
+  const handleCtrlClick = (e: React.MouseEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      navigate(`/task/${task.id}`);
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -98,6 +111,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           isDragging ? 'opacity-50 scale-105' : ''
         }`}
         onDoubleClick={handleDoubleClick}
+        onContextMenu={handleRightClick}
+        onClick={handleCtrlClick}
         onMouseDown={handleMouseDown}
       >
         <div className="flex justify-between items-start mb-2">
@@ -122,16 +137,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             {task.description}
           </p>
         )}
-        
-        {/* 子タスクリスト */}
-        <SubTaskList 
-          parentTask={task} 
-          onTaskUpdate={(updatedTask) => {
-            // タスクの更新をストアに反映
-            // この実装は簡易的なもので、実際にはもっと適切な更新処理が必要
-            console.log('Task updated:', updatedTask);
-          }}
-        />
+
         
         <div className="flex justify-between items-center text-xs text-gray-500">
           <span className="capitalize">{task.priority}</span>

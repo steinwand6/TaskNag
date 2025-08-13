@@ -4,9 +4,11 @@ interface HeaderProps {
   isLoading: boolean;
   onNewTask: () => void;
   onRefresh: () => void;
+  showDone: boolean;
+  onToggleDone: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ isLoading, onNewTask, onRefresh }) => {
+export const Header: React.FC<HeaderProps> = ({ isLoading, onNewTask, onRefresh, showDone, onToggleDone }) => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -20,6 +22,17 @@ export const Header: React.FC<HeaderProps> = ({ isLoading, onNewTask, onRefresh 
             </p>
           </div>
           <div className="flex items-center space-x-4">
+            <button 
+              onClick={onToggleDone}
+              className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                showDone 
+                  ? 'bg-green-100 text-green-800 border border-green-300' 
+                  : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+              }`}
+              disabled={isLoading}
+            >
+              {showDone ? '✅ DONE表示中' : '✅ DONE'}
+            </button>
             <button 
               onClick={onNewTask}
               className="btn-primary"

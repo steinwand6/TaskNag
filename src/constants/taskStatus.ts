@@ -3,6 +3,9 @@ import { TaskStatus } from '../types/Task';
 // Task statuses in order
 export const TASK_STATUSES: TaskStatus[] = ['inbox', 'todo', 'in_progress', 'done'];
 
+// Visible statuses (excluding done for main UI)
+export const VISIBLE_STATUSES: TaskStatus[] = ['inbox', 'todo', 'in_progress'];
+
 // Default task status
 export const DEFAULT_TASK_STATUS: TaskStatus = 'inbox';
 
