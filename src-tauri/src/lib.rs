@@ -18,12 +18,10 @@ fn handle_tray_event(app: &AppHandle, event: TrayIconEvent) {
       match button {
         MouseButton::Left => {
           if let Some(window) = app.get_webview_window("main") {
-            if window.is_visible().unwrap_or(false) {
-              let _ = window.hide();
-            } else {
-              let _ = window.show();
-              let _ = window.set_focus();
-            }
+            // シングルクリックでは表示のみ（非表示にはしない）
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.unminimize();
           }
         }
         _ => {}
@@ -31,7 +29,9 @@ fn handle_tray_event(app: &AppHandle, event: TrayIconEvent) {
     }
     TrayIconEvent::DoubleClick { .. } => {
       if let Some(window) = app.get_webview_window("main") {
+        // ダブルクリックでは確実に表示・フォーカス・最大化
         let _ = window.show();
+        let _ = window.unminimize();
         let _ = window.set_focus();
       }
     }
@@ -44,6 +44,7 @@ fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
     "show" => {
       if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
+        let _ = window.unminimize();
         let _ = window.set_focus();
       }
     }
@@ -102,7 +103,7 @@ pub fn run() {
       
       // Create system tray menu
       let show_item = MenuItem::with_id(app, "show", "表示", true, None::<&str>)?;
-      let hide_item = MenuItem::with_id(app, "hide", "最小化", true, None::<&str>)?;
+      let hide_item = MenuItem::with_id(app, "hide", "非表示", true, None::<&str>)?;
       let quit_item = MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?;
       let menu = Menu::with_items(app, &[&show_item, &hide_item, &quit_item])?;
       
