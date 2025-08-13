@@ -2,7 +2,7 @@
 export type TaskStatus = 'inbox' | 'todo' | 'in_progress' | 'done';
 
 // Priority type
-export type Priority = 'low' | 'medium' | 'high' | 'urgent';
+export type Priority = 'low' | 'medium' | 'high' | 'required';
 
 // Task interface
 export interface Task {
@@ -35,6 +35,24 @@ export interface UpdateTaskRequest {
   priority?: Priority;
   parentId?: string;
   dueDate?: Date;
+}
+
+// Notification types
+export type NotificationLevel = 1 | 2 | 3;
+
+export interface NotificationSettings {
+  enabled: boolean;
+  level1Days: number; // 期限当日 (0)
+  level2Days: number; // 期限1日前 (1) 
+  level3Days: number; // 期限3日前 (3)
+}
+
+export interface TaskNotification {
+  taskId: string;
+  title: string;
+  level: NotificationLevel;
+  daysUntilDue: number;
+  priority: Priority;
 }
 
 // Zustand store interface
