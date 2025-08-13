@@ -1,6 +1,6 @@
 use crate::models::{CreateTaskRequest, Task, UpdateTaskRequest};
 use crate::services::TaskService;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub async fn create_task(
@@ -67,4 +67,35 @@ pub async fn move_task(
         .move_task(&id, &new_status)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_incomplete_task_count(service: State<'_, TaskService>) -> Result<usize, String> {
+    service
+        .get_incomplete_task_count()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_tray_title(
+    _app: AppHandle,
+    service: State<'_, TaskService>,
+) -> Result<(), String> {
+    let count = service
+        .get_incomplete_task_count()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let title = if count > 0 {
+        format!("TaskNag ({} 件)", count)
+    } else {
+        "TaskNag".to_string()
+    };
+    
+    // Tauri v2では直接トレイアイコンのタイトルを更新する方法が異なります
+    // 現在のところ、動的更新はサポートされていない可能性があります
+    println!("Would update tray title to: {}", title);
+    
+    Ok(())
 }

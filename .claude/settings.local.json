@@ -40,7 +40,9 @@
       "mcp__serena__search_for_pattern",
       "Bash(sed:*)",
       "Bash(npm run build:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(cargo --version)",
+      "Bash(cargo clean:*)"
     ],
     "deny": [],
     "ask": []

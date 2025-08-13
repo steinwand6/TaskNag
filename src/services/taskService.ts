@@ -29,4 +29,12 @@ export class TaskService {
   static async moveTask(id: string, newStatus: TaskStatus): Promise<Task> {
     return await invoke('move_task', { id, newStatus });
   }
+
+  static async getIncompleteTaskCount(): Promise<number> {
+    return await invoke('get_incomplete_task_count');
+  }
+
+  static async updateTrayTitle(): Promise<void> {
+    return await invoke('update_tray_title');
+  }
 }

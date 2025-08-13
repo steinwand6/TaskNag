@@ -201,4 +201,18 @@ impl TaskService {
             due_date: None,
         }).await
     }
+    
+    pub async fn get_incomplete_task_count(&self) -> Result<usize, AppError> {
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) as count
+            FROM tasks
+            WHERE status != 'done'
+            "#,
+        )
+        .fetch_one(&self.db.pool)
+        .await?;
+        
+        Ok(count.0 as usize)
+    }
 }

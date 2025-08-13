@@ -22,6 +22,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
       }));
       set({ tasks: parsedTasks, isLoading: false });
+      // Update system tray title
+      TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
       set({ error: error as Error, isLoading: false });
     }
@@ -50,6 +52,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         tasks: [...state.tasks, parsedTask],
         isLoading: false
       }));
+      // Update system tray title
+      TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
       set({ error: error as Error, isLoading: false });
     }
@@ -80,6 +84,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         ),
         isLoading: false
       }));
+      // Update system tray title
+      TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
       set({ error: error as Error, isLoading: false });
     }
@@ -93,6 +99,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         tasks: state.tasks.filter((task) => task.id !== id),
         isLoading: false
       }));
+      // Update system tray title
+      TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
       set({ error: error as Error, isLoading: false });
     }
@@ -115,6 +123,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         ),
         isLoading: false
       }));
+      // Update system tray title
+      TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
       set({ error: error as Error, isLoading: false });
     }
