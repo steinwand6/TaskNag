@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task, TaskStatus, Priority } from '../types/Task';
+import { TaskStatus, Priority } from '../types/Task';
 import { useTaskStore } from '../stores/taskStore';
 import { DEFAULT_TASK_STATUS, DEFAULT_PRIORITY, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../constants';
 

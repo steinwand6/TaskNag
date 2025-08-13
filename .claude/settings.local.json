@@ -38,7 +38,9 @@
       "Bash(cargo check:*)",
       "Bash(VITE_PORT=5174 npm run tauri dev)",
       "mcp__serena__search_for_pattern",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": []

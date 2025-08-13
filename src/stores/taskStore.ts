@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Task, TaskStore, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
+import { TaskStore, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
 import { TaskService } from '../services/taskService';
 
 // Create Zustand store

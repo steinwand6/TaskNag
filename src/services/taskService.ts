@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Task, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
+import { Task, TaskStatus, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
 
 export class TaskService {
   static async createTask(request: CreateTaskRequest): Promise<Task> {
