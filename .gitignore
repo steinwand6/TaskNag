@@ -1,0 +1,70 @@
+# TaskNag - Git Ignore File
+
+# Rust/Cargo
+/target/
+/Cargo.lock
+**/*.rs.bk
+
+# Tauri
+/src-tauri/target/
+/src-tauri/Cargo.lock
+
+# Node.js/Frontend
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Build artifacts
+*.exe
+*.msi
+*.dmg
+*.app
+*.deb
+*.rpm
+
+# Code coverage
+coverage/
+*.lcov
+
+# Package manager lock files (keep yarn.lock, pnpm-lock.yaml if using)
+# package-lock.json
+
+# Tauri specific
+/src-tauri/tauri.conf.json.bak
+/src-tauri/icons/
