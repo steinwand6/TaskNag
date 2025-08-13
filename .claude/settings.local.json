@@ -33,7 +33,12 @@
       "mcp__serena__list_memories",
       "mcp__serena__think_about_whether_you_are_done",
       "Bash(npx tsc:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "mcp__serena__write_memory",
+      "Bash(cargo check:*)",
+      "Bash(VITE_PORT=5174 npm run tauri dev)",
+      "mcp__serena__search_for_pattern",
+      "Bash(sed:*)"
     ],
     "deny": [],
     "ask": []

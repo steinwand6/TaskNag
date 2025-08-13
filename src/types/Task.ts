@@ -18,6 +18,25 @@ export interface Task {
   updatedAt: Date;
 }
 
+// API Request interfaces
+export interface CreateTaskRequest {
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: Priority;
+  parentId?: string;
+  dueDate?: Date;
+}
+
+export interface UpdateTaskRequest {
+  title?: string;
+  description?: string;
+  status?: TaskStatus;
+  priority?: Priority;
+  parentId?: string;
+  dueDate?: Date;
+}
+
 // Zustand store interface
 export interface TaskStore {
   tasks: Task[];

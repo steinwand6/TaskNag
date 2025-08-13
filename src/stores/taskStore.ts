@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { Task, TaskStore } from '../types/Task';
-import { TaskService, CreateTaskRequest, UpdateTaskRequest } from '../services/taskService';
+import { Task, TaskStore, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
+import { TaskService } from '../services/taskService';
 
 // Create Zustand store
 export const useTaskStore = create<TaskStore>((set, get) => ({

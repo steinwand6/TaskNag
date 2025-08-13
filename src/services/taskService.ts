@@ -1,23 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Task, TaskStatus, Priority } from '../types/Task';
-
-export interface CreateTaskRequest {
-  title: string;
-  description?: string;
-  status: TaskStatus;
-  priority: Priority;
-  parentId?: string;
-  dueDate?: Date;
-}
-
-export interface UpdateTaskRequest {
-  title?: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: Priority;
-  parentId?: string;
-  dueDate?: Date;
-}
+import { Task, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
 
 export class TaskService {
   static async createTask(request: CreateTaskRequest): Promise<Task> {
