@@ -73,10 +73,16 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 }));
 
-// Task Card Component
-const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
-  const { updateTask, deleteTask } = useTaskStore();
+// Task Card Component  
+const TaskCard: React.FC<{ task: Task; onDragStart?: (taskId: string) => void; onDragEnd?: () => void }> = ({ 
+  task, 
+  onDragStart, 
+  onDragEnd 
+}) => {
+  const { updateTask, deleteTask, moveTask } = useTaskStore();
   const [editTask, setEditTask] = React.useState<Task | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragStartPos, setDragStartPos] = React.useState<{x: number, y: number} | null>(null);
   
   const getPriorityColor = (priority: Task['priority']) => {
     switch (priority) {
@@ -98,20 +104,80 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
   const handleDoubleClick = () => {
     setEditTask(task);
   };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // 左クリックのみ
+    
+    const startPos = { x: e.clientX, y: e.clientY };
+    setDragStartPos(startPos);
+    
+    let dragStarted = false;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = Math.abs(e.clientX - startPos.x);
+      const deltaY = Math.abs(e.clientY - startPos.y);
+      
+      if ((deltaX > 3 || deltaY > 3) && !dragStarted) {
+        dragStarted = true;
+        setIsDragging(true);
+        onDragStart?.(task.id);
+      }
+    };
+    
+    const handleMouseUp = (e: MouseEvent) => {
+      if (dragStarted) {
+        // ドロップ処理：マウスアップ位置の要素を取得
+        const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+        
+        // カラム要素を探す
+        let columnElement = elementUnderMouse;
+        let status = null;
+        
+        while (columnElement && columnElement !== document.body) {
+          if (columnElement.hasAttribute && columnElement.hasAttribute('data-status')) {
+            status = columnElement.getAttribute('data-status') as TaskStatus;
+            break;
+          }
+          columnElement = columnElement.parentElement;
+        }
+        
+        if (status) {
+          moveTask(task.id, status);
+        }
+        
+        setIsDragging(false);
+        onDragEnd?.();
+      }
+      setDragStartPos(null);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
   
   return (
     <>
       <div 
-        className={`bg-white p-3 rounded-lg border-l-4 ${getPriorityColor(task.priority)} shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
+        className={`bg-white p-3 rounded-lg border-l-4 ${getPriorityColor(task.priority)} shadow-sm hover:shadow-md transition-shadow cursor-move select-none ${
+          isDragging ? 'opacity-50 scale-105' : ''
+        }`}
         onDoubleClick={handleDoubleClick}
+        onMouseDown={handleMouseDown}
       >
         <div className="flex justify-between items-start mb-2">
           <h4 className="font-medium text-gray-900 text-sm leading-tight">
             {task.title}
           </h4>
           <button
-            onClick={() => deleteTask(task.id)}
-            className="text-gray-400 hover:text-red-500 text-xs ml-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteTask(task.id);
+            }}
+            className={`text-gray-400 hover:text-red-500 text-xs ml-2 ${
+              isDragging ? 'pointer-events-none opacity-50' : ''
+            }`}
           >
             ×
           </button>
@@ -441,14 +507,46 @@ const NewTaskModal: React.FC<{
 };
 
 function App() {
-  const { tasks, getTasksByStatus } = useTaskStore();
+  const { tasks, getTasksByStatus, moveTask } = useTaskStore();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [modalInitialStatus, setModalInitialStatus] = React.useState<TaskStatus>('inbox');
+  const [dragOverStatus, setDragOverStatus] = React.useState<TaskStatus | null>(null);
+  const [draggingTaskId, setDraggingTaskId] = React.useState<string | null>(null);
   
   const handleNewTask = (status?: TaskStatus) => {
     setModalInitialStatus(status || 'inbox');
     setIsModalOpen(true);
   };
+
+  const handleDragStart = (taskId: string) => {
+    setDraggingTaskId(taskId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingTaskId(null);
+    setDragOverStatus(null);
+  };
+
+  const handleColumnMouseEnter = (status: TaskStatus) => {
+    if (draggingTaskId) {
+      setDragOverStatus(status);
+    }
+  };
+
+  const handleColumnMouseLeave = () => {
+    if (draggingTaskId) {
+      setDragOverStatus(null);
+    }
+  };
+
+  const handleColumnClick = (status: TaskStatus) => {
+    if (draggingTaskId) {
+      moveTask(draggingTaskId, status);
+      setDraggingTaskId(null);
+      setDragOverStatus(null);
+    }
+  };
+
   
   const getStatusData = (status: TaskStatus) => {
     const statusTasks = getTasksByStatus(status);
@@ -500,15 +598,33 @@ function App() {
             const statusData = getStatusData(status);
             
             return (
-              <div key={status} className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div 
+                key={status} 
+                data-status={status}
+                className={`bg-white rounded-lg shadow-sm border border-gray-200 transition-colors ${
+                  dragOverStatus === status ? 'ring-2 ring-blue-400 border-blue-400 bg-blue-50' : ''
+                }`}
+                onMouseEnter={() => handleColumnMouseEnter(status)}
+                onMouseLeave={handleColumnMouseLeave}
+                onClick={() => handleColumnClick(status)}
+              >
                 <div className={`${statusData.color} text-white px-4 py-3 rounded-t-lg`}>
                   <h2 className="font-semibold">{statusData.title}</h2>
                   <p className="text-sm opacity-90">{statusData.subtitle} ({statusData.count})</p>
                 </div>
-                <div className="p-4 min-h-96">
+                <div 
+                  className={`p-4 min-h-96 ${
+                    dragOverStatus === status ? 'bg-blue-50/50' : ''
+                  }`}
+                >
                   <div className="space-y-3">
                     {statusData.tasks.map((task) => (
-                      <TaskCard key={task.id} task={task} />
+                      <TaskCard 
+                        key={task.id} 
+                        task={task} 
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                      />
                     ))}
                   </div>
                   

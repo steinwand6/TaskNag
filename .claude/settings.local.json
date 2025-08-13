@@ -27,7 +27,8 @@
       "mcp__serena__replace_regex",
       "Bash(rm:*)",
       "Bash(tasklist:*)",
-      "Bash(/bashes)"
+      "Bash(/bashes)",
+      "Bash(npm run tauri:*)"
     ],
     "deny": [],
     "ask": []
