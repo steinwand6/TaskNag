@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Task, TaskStatus, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
+import { Task, TaskStatus, CreateTaskRequest, UpdateTaskRequest, TaskNotification } from '../types/Task';
 
 export class TaskService {
   static async createTask(request: CreateTaskRequest): Promise<Task> {
@@ -36,5 +36,30 @@ export class TaskService {
 
   static async updateTrayTitle(): Promise<void> {
     return await invoke('update_tray_title');
+  }
+
+  static async checkNotifications(): Promise<TaskNotification[]> {
+    return await invoke('check_notifications');
+  }
+
+  // 子タスク管理機能
+  static async getChildren(parentId: string): Promise<Task[]> {
+    return await invoke('get_children', { parentId });
+  }
+
+  static async getTaskWithChildren(id: string): Promise<Task> {
+    return await invoke('get_task_with_children', { id });
+  }
+
+  static async updateProgress(id: string, progress: number): Promise<Task> {
+    return await invoke('update_progress', { id, progress });
+  }
+
+  static async calculateAndUpdateProgress(parentId: string): Promise<number> {
+    return await invoke('calculate_and_update_progress', { parentId });
+  }
+
+  static async getRootTasks(): Promise<Task[]> {
+    return await invoke('get_root_tasks');
   }
 }

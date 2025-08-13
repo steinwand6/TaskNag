@@ -44,7 +44,7 @@ pub enum Priority {
     Low,
     Medium,
     High,
-    Urgent,
+    Required,
 }
 
 impl std::fmt::Display for Priority {
@@ -53,7 +53,7 @@ impl std::fmt::Display for Priority {
             Priority::Low => write!(f, "low"),
             Priority::Medium => write!(f, "medium"),
             Priority::High => write!(f, "high"),
-            Priority::Urgent => write!(f, "urgent"),
+            Priority::Required => write!(f, "required"),
         }
     }
 }
@@ -66,7 +66,7 @@ impl std::str::FromStr for Priority {
             "low" => Ok(Priority::Low),
             "medium" => Ok(Priority::Medium),
             "high" => Ok(Priority::High),
-            "urgent" => Ok(Priority::Urgent),
+            "required" => Ok(Priority::Required),
             _ => Err(format!("Invalid priority: {}", s)),
         }
     }
@@ -85,6 +85,7 @@ pub struct Task {
     pub completed_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub progress: Option<i32>, // 進捗率 (0-100)
 }
 
 impl Task {
@@ -101,6 +102,7 @@ impl Task {
             completed_at: None,
             created_at: now.clone(),
             updated_at: now,
+            progress: Some(0), // デフォルトは0%
         }
     }
 }

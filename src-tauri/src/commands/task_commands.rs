@@ -175,3 +175,53 @@ pub async fn check_notifications(
     
     Ok(notifications)
 }
+
+#[tauri::command]
+pub async fn get_children(
+    parent_id: String,
+    service: State<'_, TaskService>,
+) -> Result<Vec<Task>, String> {
+    service
+        .get_children(&parent_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_task_with_children(
+    id: String,
+    service: State<'_, TaskService>,
+) -> Result<Task, String> {
+    service
+        .get_task_with_children(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_progress(
+    id: String,
+    progress: i32,
+    service: State<'_, TaskService>,
+) -> Result<Task, String> {
+    service
+        .update_progress(&id, progress)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn calculate_and_update_progress(
+    parent_id: String,
+    service: State<'_, TaskService>,
+) -> Result<i32, String> {
+    service
+        .calculate_and_update_progress(&parent_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_root_tasks(service: State<'_, TaskService>) -> Result<Vec<Task>, String> {
+    service.get_root_tasks().await.map_err(|e| e.to_string())
+}

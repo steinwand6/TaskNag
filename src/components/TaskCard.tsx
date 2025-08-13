@@ -2,6 +2,7 @@ import React from 'react';
 import { Task, TaskStatus } from '../types/Task';
 import { useTaskStore } from '../stores/taskStore';
 import { EditTaskModal } from './EditTaskModal';
+import { SubTaskList } from './SubTaskList';
 
 interface TaskCardProps {
   task: Task;
@@ -20,6 +21,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   
   const getPriorityColor = (priority: Task['priority']) => {
     switch (priority) {
+      case 'required': return 'border-l-red-600';
       case 'high': return 'border-l-red-500';
       case 'medium': return 'border-l-yellow-500';
       case 'low': return 'border-l-green-500';
@@ -120,6 +122,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             {task.description}
           </p>
         )}
+        
+        {/* 子タスクリスト */}
+        <SubTaskList 
+          parentTask={task} 
+          onTaskUpdate={(updatedTask) => {
+            // タスクの更新をストアに反映
+            // この実装は簡易的なもので、実際にはもっと適切な更新処理が必要
+            console.log('Task updated:', updatedTask);
+          }}
+        />
         
         <div className="flex justify-between items-center text-xs text-gray-500">
           <span className="capitalize">{task.priority}</span>

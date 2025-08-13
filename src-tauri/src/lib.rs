@@ -82,6 +82,9 @@ pub fn run() {
         )?;
       }
       
+      // 通知プラグインを初期化
+      app.handle().plugin(tauri_plugin_notification::init())?;
+      
       // Get app handle before moving into async block
       let handle = app.handle().clone();
       
@@ -119,15 +122,21 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
-      commands::create_task,
-      commands::get_tasks,
-      commands::get_task_by_id,
-      commands::update_task,
-      commands::delete_task,
-      commands::get_tasks_by_status,
-      commands::move_task,
-      commands::get_incomplete_task_count,
-      commands::update_tray_title,
+      commands::task_commands::create_task,
+      commands::task_commands::get_tasks,
+      commands::task_commands::get_task_by_id,
+      commands::task_commands::update_task,
+      commands::task_commands::delete_task,
+      commands::task_commands::get_tasks_by_status,
+      commands::task_commands::move_task,
+      commands::task_commands::get_incomplete_task_count,
+      commands::task_commands::update_tray_title,
+      commands::task_commands::check_notifications,
+      commands::task_commands::get_children,
+      commands::task_commands::get_task_with_children,
+      commands::task_commands::update_progress,
+      commands::task_commands::calculate_and_update_progress,
+      commands::task_commands::get_root_tasks,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

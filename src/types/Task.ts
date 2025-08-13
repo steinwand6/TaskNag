@@ -12,10 +12,12 @@ export interface Task {
   status: TaskStatus;
   priority: Priority;
   parentId?: string;
+  children?: Task[];
   dueDate?: Date;
   completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  progress?: number; // 進捗率 (0-100)
 }
 
 // API Request interfaces
