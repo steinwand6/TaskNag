@@ -1,6 +1,7 @@
 import React from 'react';
 import { Task, TaskStatus, Priority } from '../types/Task';
 import { useTaskStore } from '../stores/taskStore';
+import { DEFAULT_TASK_STATUS, DEFAULT_PRIORITY, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../constants';
 
 interface NewTaskModalProps {
   isOpen: boolean;
@@ -8,12 +9,12 @@ interface NewTaskModalProps {
   initialStatus?: TaskStatus;
 }
 
-export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, initialStatus = 'inbox' }) => {
+export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, initialStatus = DEFAULT_TASK_STATUS }) => {
   const { addTask, isLoading } = useTaskStore();
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
-    priority: 'medium' as Priority,
+    priority: DEFAULT_PRIORITY,
     status: initialStatus,
     dueDate: '',
   });
@@ -34,7 +35,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
       setFormData({
         title: '',
         description: '',
-        priority: 'medium',
+        priority: DEFAULT_PRIORITY,
         status: initialStatus,
         dueDate: '',
       });
@@ -97,10 +98,11 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="low">低</option>
-                <option value="medium">中</option>
-                <option value="high">高</option>
-                <option value="urgent">緊急</option>
+                {PRIORITY_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
             
@@ -113,10 +115,11 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as TaskStatus })}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="inbox">📥 INBOX</option>
-                <option value="todo">📋 TODO</option>
-                <option value="in_progress">⚡ IN PROGRESS</option>
-                <option value="done">✅ DONE</option>
+                {STATUS_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

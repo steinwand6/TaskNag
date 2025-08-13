@@ -1,6 +1,7 @@
 import React from 'react';
-import { Task, TaskStatus } from '../types/Task';
+import { Task, TaskStatus, Priority } from '../types/Task';
 import { useTaskStore } from '../stores/taskStore';
+import { DEFAULT_TASK_STATUS, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../constants';
 
 interface EditTaskModalProps {
   isOpen: boolean;
@@ -13,8 +14,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
-    priority: 'medium' as Task['priority'],
-    status: 'inbox' as TaskStatus,
+    priority: 'medium' as Priority,
+    status: DEFAULT_TASK_STATUS,
     dueDate: '',
   });
   
@@ -96,12 +97,14 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
               </label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value as Task['priority'] })}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="low">低</option>
-                <option value="medium">中</option>
-                <option value="high">高</option>
+                {PRIORITY_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
             
@@ -114,10 +117,11 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as TaskStatus })}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="inbox">📥 INBOX</option>
-                <option value="todo">📋 TODO</option>
-                <option value="in_progress">⚡ IN PROGRESS</option>
-                <option value="done">✅ DONE</option>
+                {STATUS_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

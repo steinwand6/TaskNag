@@ -3,11 +3,12 @@ import { TaskStatus } from './types/Task';
 import { useTaskStore } from './stores/taskStore';
 import { TaskCard } from './components/TaskCard';
 import { NewTaskModal } from './components/NewTaskModal';
+import { DEFAULT_TASK_STATUS, STATUS_CONFIG, TASK_STATUSES } from './constants';
 
 function App() {
   const { tasks, getTasksByStatus, moveTask, loadTasks, isLoading, error } = useTaskStore();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [modalInitialStatus, setModalInitialStatus] = React.useState<TaskStatus>('inbox');
+  const [modalInitialStatus, setModalInitialStatus] = React.useState<TaskStatus>(DEFAULT_TASK_STATUS);
   const [dragOverStatus, setDragOverStatus] = React.useState<TaskStatus | null>(null);
   const [draggingTaskId, setDraggingTaskId] = React.useState<string | null>(null);
   
@@ -17,7 +18,7 @@ function App() {
   }, [loadTasks]);
   
   const handleNewTask = (status?: TaskStatus) => {
-    setModalInitialStatus(status || 'inbox');
+    setModalInitialStatus(status || DEFAULT_TASK_STATUS);
     setIsModalOpen(true);
   };
 
@@ -52,15 +53,9 @@ function App() {
 
   const getStatusData = (status: TaskStatus) => {
     const statusTasks = getTasksByStatus(status);
-    const configs = {
-      inbox: { title: '📥 INBOX', subtitle: '未分類', color: 'bg-slate-600' },
-      todo: { title: '📋 TODO', subtitle: '実行予定', color: 'bg-blue-600' },
-      in_progress: { title: '⚡ IN PROGRESS', subtitle: '実行中', color: 'bg-purple-600' },
-      done: { title: '✅ DONE', subtitle: '完了', color: 'bg-green-600' },
-    };
     
     return {
-      ...configs[status],
+      ...STATUS_CONFIG[status],
       count: statusTasks.length,
       tasks: statusTasks,
     };
@@ -121,7 +116,7 @@ function App() {
         )}
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {(['inbox', 'todo', 'in_progress', 'done'] as TaskStatus[]).map((status) => {
+          {TASK_STATUSES.map((status) => {
             const statusData = getStatusData(status);
             
             return (
