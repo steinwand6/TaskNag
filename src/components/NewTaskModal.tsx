@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task, TaskStatus } from '../types/Task';
+import { Task, TaskStatus, Priority } from '../types/Task';
 import { useTaskStore } from '../stores/taskStore';
 
 interface NewTaskModalProps {
@@ -9,35 +9,39 @@ interface NewTaskModalProps {
 }
 
 export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, initialStatus = 'inbox' }) => {
-  const { addTask } = useTaskStore();
+  const { addTask, isLoading } = useTaskStore();
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
-    priority: 'medium' as Task['priority'],
+    priority: 'medium' as Priority,
     status: initialStatus,
     dueDate: '',
   });
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
     
-    addTask({
-      title: formData.title,
-      description: formData.description || undefined,
-      priority: formData.priority,
-      status: formData.status,
-      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
-    });
-    
-    setFormData({
-      title: '',
-      description: '',
-      priority: 'medium',
-      status: initialStatus,
-      dueDate: '',
-    });
-    onClose();
+    try {
+      await addTask({
+        title: formData.title,
+        description: formData.description || undefined,
+        priority: formData.priority,
+        status: formData.status,
+        dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
+      });
+      
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'medium',
+        status: initialStatus,
+        dueDate: '',
+      });
+      onClose();
+    } catch (error) {
+      console.error('Failed to create task:', error);
+    }
   };
   
   if (!isOpen) return null;
@@ -90,12 +94,13 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
               </label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value as Task['priority'] })}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="low">低</option>
                 <option value="medium">中</option>
                 <option value="high">高</option>
+                <option value="urgent">緊急</option>
               </select>
             </div>
             
@@ -139,8 +144,9 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
             <button
               type="submit"
               className="btn-primary"
+              disabled={isLoading}
             >
-              作成
+              {isLoading ? '作成中...' : '作成'}
             </button>
           </div>
         </form>
