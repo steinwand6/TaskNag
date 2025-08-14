@@ -12,6 +12,8 @@ import { STATUS_CONFIG, VISIBLE_STATUSES } from './constants';
 import { useModal, useDragAndDrop, useNotifications } from './hooks';
 
 import { LogService } from './services/logService';
+import { NotificationService } from './services/notificationService';
+import { listen } from '@tauri-apps/api/event';
 
 function App() {
   const { getFilteredTasks, moveTask, loadTasks, loadTags, isLoading, error, selectedTags, searchQuery } = useTaskStore();
@@ -30,12 +32,70 @@ function App() {
   const dragAndDropHandlers = useDragAndDrop(moveTask);
   useNotifications();
 
+  // 音声再生関数
+  const playNotificationSound = React.useCallback((level: number = 1) => {
+    try {
+      // Web Audio APIを使用して通知音を再生
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // レベルに応じた音の設定
+      const frequency = level === 3 ? 800 : level === 2 ? 600 : 400;
+      const duration = level === 3 ? 0.8 : 0.4;
+
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+      oscillator.type = 'sine';
+
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + duration);
+
+      LogService.info(`通知音を再生しました (Level ${level})`);
+
+      // レベル3の場合は複数回再生
+      if (level === 3) {
+        setTimeout(() => playNotificationSound(3), 500);
+        setTimeout(() => playNotificationSound(3), 1000);
+      }
+    } catch (error) {
+      LogService.error('通知音再生エラー:', error);
+    }
+  }, []);
+
   // Load tasks and tags on component mount
   React.useEffect(() => {
     LogService.info('アプリ', 'TaskNagアプリケーションが起動しました');
     loadTasks();
     loadTags();
-  }, [loadTasks, loadTags]);
+    
+    // 通知サービスを初期化
+    NotificationService.initialize().catch(error => {
+      LogService.error('通知サービス初期化エラー:', error);
+    });
+
+    // Tauriイベントリスナーを設定
+    const setupEventListeners = async () => {
+      try {
+        // 通知音再生イベント
+        await listen('play_notification_sound', (event) => {
+          const { level } = event.payload as { level: number };
+          playNotificationSound(level);
+        });
+
+        LogService.info('Tauriイベントリスナーを設定しました');
+      } catch (error) {
+        LogService.error('イベントリスナー設定エラー:', error);
+      }
+    };
+
+    setupEventListeners();
+  }, [loadTasks, loadTags, playNotificationSound]);
 
   // Get statuses to display based on showDone state
   const displayStatuses = showDone 

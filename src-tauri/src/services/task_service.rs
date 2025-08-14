@@ -575,7 +575,7 @@ impl TaskService {
     
     // 新しい通知システム
     pub async fn check_notifications(&self) -> Result<Vec<crate::models::TaskNotification>, AppError> {
-        use chrono::{DateTime, Utc, Weekday, Datelike};
+        use chrono::{DateTime, Utc, Local, Weekday, Datelike};
         
         let tasks = sqlx::query_as::<_, Task>(
             r#"
@@ -589,32 +589,67 @@ impl TaskService {
         .fetch_all(&self.db.pool)
         .await?;
         
-        let mut notifications = Vec::new();
-        let now = Utc::now();
+        if !tasks.is_empty() {
+            println!("NotificationCheck: Found {} tasks with notifications at {} (Local: {})", 
+                     tasks.len(), 
+                     Utc::now().format("%H:%M:%S UTC"),
+                     Local::now().format("%H:%M:%S JST"));
+        }
         
-        for task in tasks {
+        let mut notifications = Vec::new();
+        let now_local = Local::now();
+        let now = now_local.naive_local().and_utc(); // ローカル時刻をnaive形式でUTCとして扱う
+        
+        for task in &tasks {
             let notification_type = task.notification_type.as_deref().unwrap_or("none");
             
             match notification_type {
                 "due_date_based" => {
                     if let Some(due_date_str) = &task.due_date {
                         if let Ok(due_date) = DateTime::parse_from_rfc3339(due_date_str) {
-                            let due_date_utc = due_date.with_timezone(&Utc);
-                            let days_until_due = (due_date_utc - now).num_days();
-                            let days_before = task.notification_days_before.unwrap_or(1);
+                            // 期日もローカル時刻として解釈
+                            let due_date_local = due_date.naive_utc().and_local_timezone(chrono::Local).unwrap();
                             
-                            // 期日ベース通知の判定
-                            if days_until_due <= days_before as i64 && days_until_due >= 0 {
-                                if let Some(time_str) = &task.notification_time {
-                                    if should_notify_at_time(&now, time_str) {
-                                        notifications.push(crate::models::TaskNotification {
-                                            task_id: task.id,
-                                            title: task.title,
-                                            level: task.notification_level.unwrap_or(1),
-                                            days_until_due: Some(days_until_due),
-                                            notification_type: "due_date_based".to_string(),
-                                        });
-                                    }
+                            // notification_timeが設定されている場合は、期限時刻として使用
+                            let target_due_time = if let Some(time_str) = &task.notification_time {
+                                if let Ok(target_time) = chrono::NaiveTime::parse_from_str(time_str, "%H:%M") {
+                                    // 期日の日付 + 指定された時刻
+                                    due_date_local.date_naive().and_time(target_time).and_local_timezone(chrono::Local).unwrap()
+                                } else {
+                                    due_date_local
+                                }
+                            } else {
+                                due_date_local
+                            };
+                            
+                            let target_due_as_utc = target_due_time.naive_local().and_utc();
+                            let hours_until_due = (target_due_as_utc - now).num_hours();
+                            let days_before = task.notification_days_before.unwrap_or(1);
+                            let notification_start_hours = days_before as i64 * 24;
+                            
+                            println!("NotificationCheck: Task '{}' - Target Due: {} JST, Current: {} JST, Hours until: {}", 
+                                     task.title, 
+                                     target_due_time.format("%m/%d %H:%M"),
+                                     now_local.format("%m/%d %H:%M"),
+                                     hours_until_due);
+                            
+                            // 期日ベース通知の判定：指定日数前から毎時0分に通知
+                            if hours_until_due <= notification_start_hours && hours_until_due >= 0 {
+                                // 毎時0分±1分（0分、1分）で通知
+                                use chrono::Timelike;
+                                let minutes = now_local.minute();
+                                let is_notification_time = minutes <= 1;
+                                
+                                if is_notification_time {
+                                    println!("NotificationCheck: ✅ Creating due-date notification for task: {} ({}h until target due time {}) at {}:{:02}", 
+                                             task.title, hours_until_due, target_due_time.format("%H:%M"), now_local.hour(), minutes);
+                                    notifications.push(crate::models::TaskNotification {
+                                        task_id: task.id.clone(),
+                                        title: task.title.clone(),
+                                        level: task.notification_level.unwrap_or(1),
+                                        days_until_due: Some(hours_until_due / 24),
+                                        notification_type: "due_date_based".to_string(),
+                                    });
                                 }
                             }
                         }
@@ -624,7 +659,7 @@ impl TaskService {
                     // 定期通知の判定
                     if let (Some(days_str), Some(time_str)) = (&task.notification_days_of_week, &task.notification_time) {
                         if let Ok(days_of_week) = serde_json::from_str::<Vec<i32>>(days_str) {
-                            let current_weekday = match now.weekday() {
+                            let current_weekday = match now_local.weekday() {
                                 Weekday::Sun => 0,
                                 Weekday::Mon => 1,
                                 Weekday::Tue => 2,
@@ -634,10 +669,10 @@ impl TaskService {
                                 Weekday::Sat => 6,
                             };
                             
-                            if days_of_week.contains(&current_weekday) && should_notify_at_time(&now, time_str) {
+                            if days_of_week.contains(&current_weekday) && should_notify_at_time(&now_local, time_str) {
                                 notifications.push(crate::models::TaskNotification {
-                                    task_id: task.id,
-                                    title: task.title,
+                                    task_id: task.id.clone(),
+                                    title: task.title.clone(),
                                     level: task.notification_level.unwrap_or(1),
                                     days_until_due: None,
                                     notification_type: "recurring".to_string(),
@@ -650,24 +685,36 @@ impl TaskService {
             }
         }
         
+        if !notifications.is_empty() {
+            println!("NotificationCheck: Generated {} notifications:", notifications.len());
+            for notification in &notifications {
+                println!("  - {} (Level {}, {})", notification.title, notification.level, notification.notification_type);
+            }
+        }
+        
         Ok(notifications)
     }
 }
 
 // 指定時刻での通知判定（±30秒の範囲）
-fn should_notify_at_time(now: &chrono::DateTime<chrono::Utc>, time_str: &str) -> bool {
+fn should_notify_at_time<T>(now: &chrono::DateTime<T>, time_str: &str) -> bool 
+where T: chrono::TimeZone {
     use chrono::{NaiveTime, Timelike};
+    
     if let Ok(target_time) = NaiveTime::parse_from_str(time_str, "%H:%M") {
         let current_time = now.time();
         let target_seconds = target_time.num_seconds_from_midnight();
         let current_seconds = current_time.num_seconds_from_midnight();
         
-        // ±30秒の範囲で通知
-        (current_seconds as i32 - target_seconds as i32).abs() <= 30
+        let time_diff = (current_seconds as i32 - target_seconds as i32).abs();
+        
+        // ±30秒の範囲
+        time_diff <= 30
     } else {
         false
     }
 }
+
 
 impl TaskService {
     // タグ関連メソッド

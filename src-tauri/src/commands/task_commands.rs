@@ -1,6 +1,7 @@
 use crate::models::{CreateTaskRequest, Task, UpdateTaskRequest};
 use crate::services::TaskService;
-use tauri::{AppHandle, State, Emitter};
+use tauri::{AppHandle, State, Emitter, Manager};
+use tauri_plugin_notification::NotificationExt;
 
 #[tauri::command]
 pub async fn create_task(
@@ -110,7 +111,7 @@ pub async fn check_notifications(
     
     for notification in notifications {
         // 通知レベルに応じて通知を送信
-        let (title, body) = match notification.notification_type.as_str() {
+        let title = match notification.notification_type.as_str() {
             "due_date_based" => {
                 let days_text = match notification.days_until_due.unwrap_or(0) {
                     0 => "【期限当日】",
@@ -118,51 +119,19 @@ pub async fn check_notifications(
                     d if d <= 3 => "【期限間近】",
                     _ => "【期限通知】",
                 };
-                (
-                    format!("📅 {}", days_text),
-                    notification.title.clone()
-                )
+                format!("📅 {}", days_text)
             },
-            "recurring" => {
-                (
-                    "🔔 定期リマインド".to_string(),
-                    notification.title.clone()
-                )
-            },
-            _ => (
-                "📋 タスク通知".to_string(),
-                notification.title.clone()
-            )
+            "recurring" => "🔔 定期リマインド".to_string(),
+            _ => "📋 タスク通知".to_string()
         };
         
-        // 通知レベルに応じた処理（Level 1-3）
-        match notification.level {
-            1 => {
-                // Level 1: システム通知のみ
-                let _ = app.emit("notification", serde_json::json!({
-                    "title": title,
-                    "body": body
-                }));
-            },
-            2 => {
-                // Level 2: システム通知 + 音声通知
-                let _ = app.emit("notification", serde_json::json!({
-                    "title": title,
-                    "body": body
-                }));
-                let _ = app.emit("sound_notification", serde_json::json!({}));
-            },
-            3 => {
-                // Level 3: アプリ最大化 + 通知
-                let _ = app.emit("notification", serde_json::json!({
-                    "title": title,
-                    "body": body
-                }));
-                let _ = app.emit("sound_notification", serde_json::json!({}));
-                let _ = app.emit("maximize_app", serde_json::json!({}));
-            },
-            _ => {} // Invalid level
-        }
+        // Windows通知を送信
+        send_windows_notification(
+            app.clone(),
+            title,
+            notification.title.clone(),
+            notification.level as u32,
+        ).await?;
         
         // 通知情報を記録
         result.push(serde_json::json!({
@@ -247,4 +216,92 @@ pub async fn calculate_and_update_progress(
 #[tauri::command]
 pub async fn get_root_tasks(service: State<'_, TaskService>) -> Result<Vec<Task>, String> {
     service.get_root_tasks().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn send_windows_notification(
+    app: AppHandle,
+    title: String,
+    body: String,
+    level: u32,
+) -> Result<(), String> {
+    // Windows通知を送信
+    app.notification()
+        .builder()
+        .title(&title)
+        .body(&body)
+        .show()
+        .map_err(|e| e.to_string())?;
+    
+    // レベル2以上で音を鳴らす
+    if level >= 2 {
+        let _ = app.emit("play_notification_sound", serde_json::json!({ "level": level }));
+    }
+    
+    // レベル3でアプリを最大化
+    if level >= 3 {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn test_notification_immediate(
+    app: AppHandle,
+    service: State<'_, TaskService>,
+) -> Result<Vec<serde_json::Value>, String> {
+    // 現在の通知設定を持つタスクをすべて取得して即座に通知を送信
+    let _notifications = service.check_notifications().await.map_err(|e| e.to_string())?;
+    let mut result = Vec::new();
+    
+    // 通知チェックロジックを無視して、設定のあるすべてのタスクを通知
+    let all_tasks = service.get_tasks().await.map_err(|e| e.to_string())?;
+    
+    for task in all_tasks {
+        if let Some(notification_type) = &task.notification_type {
+            if notification_type != "none" {
+                let level = task.notification_level.unwrap_or(1);
+                
+                // 通知タイプに応じた表示
+                let (title_prefix, test_suffix) = match notification_type.as_str() {
+                    "due_date_based" => ("📅 期日通知", "（テスト）"),
+                    "recurring" => ("🔔 定期通知", "（テスト）"),
+                    _ => ("📋 通知", "（テスト）"),
+                };
+                
+                let title = format!("{}{}", title_prefix, test_suffix);
+                
+                // Windows通知を送信
+                send_windows_notification(
+                    app.clone(),
+                    title.clone(),
+                    task.title.clone(),
+                    level as u32,
+                ).await?;
+                
+                result.push(serde_json::json!({
+                    "taskId": task.id,
+                    "title": task.title,
+                    "level": level,
+                    "notificationType": notification_type,
+                    "testMode": true
+                }));
+                
+                println!("TestNotification: Sent immediate test notification for task: {} (Level {})", task.title, level);
+            }
+        }
+    }
+    
+    if result.is_empty() {
+        println!("TestNotification: No tasks with notification settings found");
+    } else {
+        println!("TestNotification: Sent {} immediate test notifications", result.len());
+    }
+    
+    Ok(result)
 }

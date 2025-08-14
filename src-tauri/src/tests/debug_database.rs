@@ -2,8 +2,13 @@ use sqlx::sqlite::SqlitePoolOptions;
 
 #[tokio::test]
 async fn debug_real_database() {
-    // 実際のデータベースファイルのパスを取得
-    let app_data_dir = std::path::PathBuf::from(r"C:\Users\stone\AppData\Roaming\com.tasknag.app");
+    // 実際のデータベースファイルのパスを動的に取得
+    let app_data_dir = if let Some(appdata) = std::env::var_os("APPDATA") {
+        std::path::PathBuf::from(appdata).join("com.tasknag.app")
+    } else {
+        // フォールバック: 一般的なパス
+        dirs::config_dir().unwrap_or_default().join("com.tasknag.app")
+    };
     
     let db_path = app_data_dir.join("tasknag.db");
     println!("Database path: {:?}", db_path);

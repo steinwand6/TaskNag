@@ -140,6 +140,8 @@ pub fn run() {
       commands::task_commands::update_progress,
       commands::task_commands::calculate_and_update_progress,
       commands::task_commands::get_root_tasks,
+      commands::task_commands::send_windows_notification,
+      commands::task_commands::test_notification_immediate,
       commands::tag_commands::get_all_tags,
       commands::tag_commands::get_tag_by_id,
       commands::tag_commands::create_tag,

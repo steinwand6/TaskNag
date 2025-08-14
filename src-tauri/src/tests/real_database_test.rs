@@ -6,8 +6,13 @@ use sqlx::sqlite::SqlitePoolOptions;
 /// 実際のデータベースでタグ追加をテスト
 #[tokio::test]
 async fn test_real_database_tag_update() {
-    // 実際のデータベースファイルのパスを取得
-    let app_data_dir = std::path::PathBuf::from(r"C:\Users\stone\AppData\Roaming\com.tasknag.app");
+    // 実際のデータベースファイルのパスを動的に取得
+    let app_data_dir = if let Some(appdata) = std::env::var_os("APPDATA") {
+        std::path::PathBuf::from(appdata).join("com.tasknag.app")
+    } else {
+        // フォールバック: 一般的なパス
+        dirs::config_dir().unwrap_or_default().join("com.tasknag.app")
+    };
     let db_path = app_data_dir.join("tasknag.db");
     
     if !db_path.exists() {

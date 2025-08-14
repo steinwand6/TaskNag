@@ -61,8 +61,9 @@
       "Bash(scriptsdev.bat restart)",
       "Bash(sqlite3:*)",
       "Bash(cp:*)",
-      "Bash(del \"C:\\Users\\stone\\AppData\\Roaming\\com.tasknag.app\\tasknag.db\")",
-      "Bash(npm run test:*)"
+      "Bash(del \"%APPDATA%\\com.tasknag.app\\tasknag.db\")",
+      "Bash(npm run test:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": [],
