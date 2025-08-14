@@ -9,6 +9,8 @@ interface HeaderProps {
   onToggleFilters?: () => void;
   showFilters?: boolean;
   hasActiveFilters?: boolean;
+  onOpenAgentChat?: () => void;
+  onOpenSmartCreator?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -19,7 +21,9 @@ export const Header: React.FC<HeaderProps> = ({
   onManageTags, 
   onToggleFilters, 
   showFilters = false, 
-  hasActiveFilters = false
+  hasActiveFilters = false,
+  onOpenAgentChat,
+  onOpenSmartCreator
 }) => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -70,6 +74,26 @@ export const Header: React.FC<HeaderProps> = ({
             >
               {showDone ? '✅ DONE表示中' : '✅ DONE'}
             </button>
+            {onOpenSmartCreator && (
+              <button 
+                onClick={onOpenSmartCreator}
+                className="px-3 py-2 text-sm rounded-md bg-purple-100 text-purple-800 border border-purple-300 hover:bg-purple-200 transition-colors"
+                disabled={isLoading}
+                title="AIでタスクを作成"
+              >
+                🤖 AI作成
+              </button>
+            )}
+            {onOpenAgentChat && (
+              <button 
+                onClick={onOpenAgentChat}
+                className="px-3 py-2 text-sm rounded-md bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200 transition-colors"
+                disabled={isLoading}
+                title="AIアシスタントとチャット"
+              >
+                💬 AI相談
+              </button>
+            )}
             <button 
               onClick={onNewTask}
               className="btn-primary"

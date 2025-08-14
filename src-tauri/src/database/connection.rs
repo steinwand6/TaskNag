@@ -1,6 +1,7 @@
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use tauri::{AppHandle, Manager};
 
+#[derive(Clone)]
 pub struct Database {
     pub pool: Pool<Sqlite>,
 }

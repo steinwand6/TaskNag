@@ -57,6 +57,8 @@ pub struct GenerateResponse {
     pub response: String,
     pub done: bool,
     #[serde(default)]
+    pub thinking: Option<String>,
+    #[serde(default)]
     pub context: Option<Vec<i32>>,
     #[serde(default)]
     pub total_duration: Option<u64>,
@@ -110,11 +112,24 @@ impl OllamaClient {
     /// Test connection to Ollama server
     pub async fn test_connection(&self) -> Result<bool, OllamaError> {
         let url = format!("{}/api/tags", self.base_url);
+        log::info!("Ollama接続テスト URL: {}", url);
         
         match self.client.get(&url).send().await {
-            Ok(response) if response.status().is_success() => Ok(true),
-            Ok(_) => Err(OllamaError::ServerNotAvailable(self.base_url.clone())),
+            Ok(response) => {
+                let status = response.status();
+                log::info!("Ollama応答ステータス: {}", status);
+                
+                if status.is_success() {
+                    log::info!("Ollama接続成功");
+                    Ok(true)
+                } else {
+                    log::error!("Ollama接続失敗 - ステータス: {}", status);
+                    Err(OllamaError::ServerNotAvailable(self.base_url.clone()))
+                }
+            },
             Err(e) => {
+                log::error!("Ollama接続エラー詳細: {:?}", e);
+                
                 if e.is_timeout() {
                     Err(OllamaError::Timeout(self.timeout_seconds))
                 } else if e.is_connect() {
@@ -183,6 +198,27 @@ impl OllamaClient {
         Ok(generate_response)
     }
     
+    /// Get actual response content (either response or thinking field)
+    pub fn get_response_content(response: &GenerateResponse) -> String {
+        if !response.response.is_empty() {
+            response.response.clone()
+        } else if let Some(thinking) = &response.thinking {
+            thinking.clone()
+        } else {
+            "No response generated".to_string()
+        }
+    }
+    
+    /// Generate text with Japanese support and smart response extraction
+    pub async fn generate_japanese(
+        &self,
+        prompt: &str,
+        options: Option<GenerateOptions>,
+    ) -> Result<String, OllamaError> {
+        let response = self.generate(prompt, options).await?;
+        Ok(Self::get_response_content(&response))
+    }
+    
     /// Generate JSON response
     pub async fn generate_json(
         &self,
@@ -190,7 +226,9 @@ impl OllamaClient {
         options: Option<GenerateOptions>,
     ) -> Result<serde_json::Value, OllamaError> {
         let url = format!("{}/api/generate", self.base_url);
+        log::info!("JSON生成リクエスト URL: {}, モデル: {}", url, self.default_model);
         
+        // gemma3:12bモデルはformat: "json"に対応
         let request = GenerateRequest {
             model: self.default_model.clone(),
             prompt: prompt.to_string(),
@@ -199,18 +237,30 @@ impl OllamaClient {
             format: Some("json".to_string()),
         };
         
+        log::info!("リクエスト送信中...");
         let response = self.client
             .post(&url)
             .json(&request)
             .send()
             .await?;
         
-        if !response.status().is_success() {
+        let status = response.status();
+        log::info!("レスポンスステータス: {}", status);
+        
+        if !status.is_success() {
+            log::error!("HTTP エラー - ステータス: {}", status);
             return Err(OllamaError::ServerNotAvailable(self.base_url.clone()));
         }
         
+        log::info!("JSON パース中...");
         let generate_response: GenerateResponse = response.json().await?;
+        
+        log::info!("生成されたレスポンス長: {}", generate_response.response.len());
+        log::info!("レスポンス内容（最初の200文字）: {}", 
+                  &generate_response.response.chars().take(200).collect::<String>());
+        
         let json_value: serde_json::Value = serde_json::from_str(&generate_response.response)?;
+        log::info!("JSON パース成功");
         Ok(json_value)
     }
 }

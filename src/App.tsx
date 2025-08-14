@@ -8,6 +8,8 @@ import { ErrorMessage } from './components/ErrorMessage';
 import { LoadingIndicator } from './components/LoadingIndicator';
 import { TagManager } from './components/TagManager';
 import { TaskFilter } from './components/TaskFilter';
+import { AgentChat } from './components/AgentChat';
+import { SmartTaskCreator } from './components/SmartTaskCreator';
 import { STATUS_CONFIG, VISIBLE_STATUSES } from './constants';
 import { useModal, useDragAndDrop, useNotifications } from './hooks';
 
@@ -26,6 +28,10 @@ function App() {
   
   // State for showing filter panel
   const [showFilters, setShowFilters] = React.useState(false);
+  
+  // State for AI features
+  const [showAgentChat, setShowAgentChat] = React.useState(false);
+  const [showSmartCreator, setShowSmartCreator] = React.useState(false);
   
   // Custom hooks
   const { isModalOpen, modalInitialStatus, openModal, closeModal } = useModal();
@@ -128,6 +134,8 @@ function App() {
         onToggleFilters={() => setShowFilters(!showFilters)}
         showFilters={showFilters}
         hasActiveFilters={selectedTags.length > 0 || searchQuery.trim().length > 0}
+        onOpenAgentChat={() => setShowAgentChat(true)}
+        onOpenSmartCreator={() => setShowSmartCreator(true)}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -174,6 +182,16 @@ function App() {
       <TagManager
         isOpen={showTagManager}
         onClose={() => setShowTagManager(false)}
+      />
+
+      <AgentChat
+        isOpen={showAgentChat}
+        onClose={() => setShowAgentChat(false)}
+      />
+
+      <SmartTaskCreator
+        isOpen={showSmartCreator}
+        onClose={() => setShowSmartCreator(false)}
       />
 
     </div>

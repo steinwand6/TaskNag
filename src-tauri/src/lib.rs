@@ -7,7 +7,7 @@ pub mod services;
 pub mod tests;
 
 use database::Database;
-use services::TaskService;
+use services::{TaskService, AgentService};
 use tauri::{
   AppHandle, Manager, WindowEvent, 
   tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
@@ -17,16 +17,13 @@ use tauri::{
 fn handle_tray_event(app: &AppHandle, event: TrayIconEvent) {
   match event {
     TrayIconEvent::Click { button, .. } => {
-      match button {
-        MouseButton::Left => {
-          if let Some(window) = app.get_webview_window("main") {
-            // シングルクリックでは表示のみ（非表示にはしない）
-            let _ = window.show();
-            let _ = window.set_focus();
-            let _ = window.unminimize();
-          }
+      if button == MouseButton::Left {
+        if let Some(window) = app.get_webview_window("main") {
+          // シングルクリックでは表示のみ（非表示にはしない）
+          let _ = window.show();
+          let _ = window.set_focus();
+          let _ = window.unminimize();
         }
-        _ => {}
       }
     }
     TrayIconEvent::DoubleClick { .. } => {
@@ -66,13 +63,10 @@ fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
 pub fn run() {
   tauri::Builder::default()
     .on_window_event(|window, event| {
-      match event {
-        WindowEvent::CloseRequested { api, .. } => {
-          // ウィンドウを閉じる代わりに最小化
-          let _ = window.hide();
-          api.prevent_close();
-        }
-        _ => {}
+      if let WindowEvent::CloseRequested { api, .. } = event {
+        // ウィンドウを閉じる代わりに最小化
+        let _ = window.hide();
+        api.prevent_close();
       }
     })
     .setup(|app| {
@@ -100,10 +94,12 @@ pub fn run() {
           .expect("Failed to initialize database");
         
         // Initialize services
-        let task_service = TaskService::new(db);
+        let task_service = TaskService::new(db.clone());
+        let agent_service = AgentService::new(db.pool);
         
         // Add services to app state
         handle.manage(task_service);
+        handle.manage(agent_service);
       });
       
       // Create system tray menu
@@ -118,7 +114,7 @@ pub fn run() {
         .title("TaskNag")
         .menu(&menu)
         .on_tray_icon_event(|tray, event| handle_tray_event(tray.app_handle(), event))
-        .on_menu_event(|app, event| handle_menu_event(app, event))
+        .on_menu_event(handle_menu_event)
         .build(app)?;
       
       Ok(())
@@ -153,6 +149,12 @@ pub fn run() {
       commands::log_commands::write_log,
       commands::log_commands::get_log_file_path,
       commands::log_commands::read_recent_logs,
+      commands::agent_commands::test_ollama_connection,
+      commands::agent_commands::list_ollama_models,
+      commands::agent_commands::analyze_task_with_ai,
+      commands::agent_commands::create_project_plan,
+      commands::agent_commands::parse_natural_language_task,
+      commands::agent_commands::chat_with_agent,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

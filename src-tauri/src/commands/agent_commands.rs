@@ -6,10 +6,18 @@ use serde_json::Value;
 pub async fn test_ollama_connection(
     agent: State<'_, AgentService>,
 ) -> Result<bool, String> {
-    agent
+    log::info!("Ollama接続テスト開始");
+    
+    let result = agent
         .test_connection()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            log::error!("Ollama接続テストエラー: {}", e);
+            format!("Ollama接続失敗: {}", e)
+        })?;
+    
+    log::info!("Ollama接続テスト結果: {}", result);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -27,13 +35,22 @@ pub async fn analyze_task_with_ai(
     description: String,
     agent: State<'_, AgentService>,
 ) -> Result<Value, String> {
+    log::info!("AI分析リクエスト開始: {}", description);
+    
     let analysis = agent
         .analyze_task(&description)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            log::error!("AI分析エラー: {}", e);
+            format!("AI分析に失敗しました: {}", e)
+        })?;
     
+    log::info!("AI分析成功");
     serde_json::to_value(analysis)
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            log::error!("JSON変換エラー: {}", e);
+            format!("結果の変換に失敗しました: {}", e)
+        })
 }
 
 #[tauri::command]
@@ -55,10 +72,22 @@ pub async fn parse_natural_language_task(
     request: String,
     agent: State<'_, AgentService>,
 ) -> Result<Value, String> {
-    agent
+    log::info!("自然言語タスク解析リクエスト開始: {}", request);
+    
+    let result = agent
         .parse_natural_language_task(&request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            log::error!("自然言語タスク解析エラー: {}", e);
+            format!("自然言語解析に失敗しました: {}", e)
+        })?;
+    
+    log::info!("自然言語タスク解析成功");
+    serde_json::to_value(result)
+        .map_err(|e| {
+            log::error!("JSON変換エラー: {}", e);
+            format!("結果の変換に失敗しました: {}", e)
+        })
 }
 
 #[tauri::command]

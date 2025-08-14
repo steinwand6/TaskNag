@@ -90,6 +90,12 @@ pub struct PromptManager {
     templates: std::collections::HashMap<String, String>,
 }
 
+impl Default for PromptManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PromptManager {
     pub fn new() -> Self {
         let mut templates = std::collections::HashMap::new();
@@ -97,54 +103,74 @@ impl PromptManager {
         // Task Analysis Prompt
         templates.insert(
             "task_analysis".to_string(),
-            r#"You are a task management expert. Analyze the following task description and provide structured suggestions.
+            r#"あなたはタスク管理の専門家です。以下のタスクを分析して、改善提案をJSONで返してください。
 
-Task Description: {description}
+タスク内容: {description}
 
-Please respond with a JSON object containing:
-- improved_title: A clear, action-oriented title (max 50 chars)
-- improved_description: An enhanced description with clear objectives
-- suggested_tags: Array of relevant tags (max 5)
-- complexity: Either "simple", "medium", or "complex"
-- estimated_hours: Realistic time estimate in hours
-- subtasks: Array of subtask objects with title, description, and order
-- priority_reasoning: Brief explanation of priority level
+以下の形式のJSONで応答してください:
+{{
+  "improved_title": "明確で行動指向のタイトル（50文字以内）",
+  "improved_description": "目標が明確な詳細説明",
+  "suggested_tags": ["関連するタグ（最大5個）"],
+  "complexity": "simple/medium/complex のいずれか",
+  "estimated_hours": 時間の見積もり（数値）,
+  "subtasks": [
+    {{"title": "サブタスクのタイトル", "description": "詳細", "order": 1}}
+  ],
+  "priority_reasoning": "優先度の根拠説明"
+}}
 
-Focus on making the task actionable and measurable. Be concise but comprehensive."#.to_string()
+タスクを実行可能で測定可能にすることに重点を置いて分析してください。日本語で回答してください。"#.to_string()
         );
         
         // Project Planning Prompt
         templates.insert(
             "project_planning".to_string(),
-            r#"You are a project planning expert. Create a detailed project plan for the following request.
+            r#"あなたはプロジェクト計画の専門家です。以下の要求に対して詳細なプロジェクト計画を作成してください。
 
-Project Description: {description}
+プロジェクト概要: {description}
 
-Please respond with a JSON object containing:
-- phases: Array of project phases, each with name, description, tasks, estimated_days, and order
-- total_estimated_days: Total project duration
-- dependencies: Array of task dependencies
-- milestones: Key project milestones
+以下の形式のJSONで応答してください:
+{{
+  "phases": [
+    {{
+      "name": "フェーズ名",
+      "description": "フェーズの説明",
+      "tasks": [{"title": "タスク名", "description": "詳細", "order": 1}],
+      "estimated_days": 日数見積もり,
+      "order": 順序
+    }}
+  ],
+  "total_estimated_days": 総日数見積もり,
+  "dependencies": [
+    {{"from_task": "前提タスク", "to_task": "依存先タスク", "dependency_type": "blocks"}}
+  ],
+  "milestones": [
+    {{"name": "マイルストーン名", "description": "説明", "target_date": "YYYY-MM-DD"}}
+  ]
+}}
 
-Break down the project into logical phases with clear deliverables. Be realistic with time estimates."#.to_string()
+プロジェクトを論理的なフェーズに分解し、明確な成果物を定義してください。現実的な時間見積もりを行ってください。日本語で回答してください。"#.to_string()
         );
         
         // Natural Language Task Creation
         templates.insert(
             "natural_language_task".to_string(),
-            r#"Convert the following natural language request into structured task data.
+            r#"以下の自然言語の要求を構造化されたタスクデータに変換してください。
 
-Request: {request}
+要求: {request}
 
-Extract and return a JSON object with:
-- title: Brief task title
-- description: Detailed description
-- suggested_status: "todo", "in_progress", or "in_review"
-- due_date_suggestion: If mentioned, format as "YYYY-MM-DD"
-- tags: Relevant category tags
-- notification_needed: true/false based on urgency
+以下の形式のJSONで応答してください:
+{{
+  "title": "簡潔なタスクタイトル",
+  "description": "詳細な説明",
+  "suggested_status": "todo/in_progress/in_review のいずれか",
+  "due_date_suggestion": "言及されている場合 YYYY-MM-DD 形式",
+  "tags": ["関連するカテゴリタグ"],
+  "notification_needed": 緊急度に基づく true/false
+}}
 
-Be precise and extract all relevant information from the request."#.to_string()
+要求から関連するすべての情報を正確に抽出してください。日本語で回答してください。"#.to_string()
         );
         
         Self { templates }
@@ -173,7 +199,11 @@ pub struct AgentService {
 impl AgentService {
     pub fn new(db: SqlitePool) -> Self {
         Self {
-            ollama: OllamaClient::default(),
+            ollama: OllamaClient::new(
+                "http://localhost:11434".to_string(),
+                "gemma3:12b".to_string(),
+                60  // タイムアウトも60秒に延長
+            ),
             prompt_manager: PromptManager::new(),
             db,
         }
@@ -258,10 +288,10 @@ impl AgentService {
     
     /// Chat with the agent
     pub async fn chat(&self, message: &str, context: Option<String>) -> Result<String, AgentError> {
-        let mut prompt = message.to_string();
+        let mut prompt = format!("あなたは親切なアシスタントです。日本語で自然に会話してください。\n\nユーザー: {}", message);
         
         if let Some(ctx) = context {
-            prompt = format!("Context: {}\n\nUser: {}", ctx, message);
+            prompt = format!("Context: {}\n\n{}", ctx, prompt);
         }
         
         let options = GenerateOptions {
@@ -272,7 +302,7 @@ impl AgentService {
         };
         
         let response = self.ollama.generate(&prompt, Some(options)).await?;
-        Ok(response.response)
+        Ok(OllamaClient::get_response_content(&response))
     }
     
     /// Save conversation to database

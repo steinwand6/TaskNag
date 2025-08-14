@@ -63,7 +63,9 @@
       "Bash(cp:*)",
       "Bash(del \"%APPDATA%\\com.tasknag.app\\tasknag.db\")",
       "Bash(npm run test:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(curl:*)",
+      "Bash(ollama list:*)"
     ],
     "deny": [],
     "ask": [],

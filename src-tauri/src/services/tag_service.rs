@@ -185,7 +185,7 @@ impl TagService {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(AppError::NotFound(format!("Task-tag relation not found")));
+            return Err(AppError::NotFound("Task-tag relation not found".to_string()));
         }
 
         Ok(())

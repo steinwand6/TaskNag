@@ -64,12 +64,12 @@ impl TaskService {
         .bind(&task.completed_at)
         .bind(&task.created_at)
         .bind(&task.updated_at)
-        .bind(&task.progress)
+        .bind(task.progress)
         .bind(&task.notification_type)
-        .bind(&task.notification_days_before)
+        .bind(task.notification_days_before)
         .bind(&task.notification_time)
         .bind(&task.notification_days_of_week)
-        .bind(&task.notification_level)
+        .bind(task.notification_level)
         .execute(&self.db.pool)
         .await?;
         
@@ -201,12 +201,12 @@ impl TaskService {
         .bind(&task.due_date)
         .bind(&task.completed_at)
         .bind(&task.updated_at)
-        .bind(&task.progress)
+        .bind(task.progress)
         .bind(&task.notification_type)
-        .bind(&task.notification_days_before)
+        .bind(task.notification_days_before)
         .bind(&task.notification_time)
         .bind(&task.notification_days_of_week)
-        .bind(&task.notification_level)
+        .bind(task.notification_level)
         .execute(&mut *tx)
         .await {
             Ok(result) => {
@@ -406,7 +406,7 @@ impl TaskService {
         use crate::models::TaskStatus;
         
         let status = TaskStatus::from_str(new_status)
-            .map_err(|e| AppError::InvalidInput(e))?;
+            .map_err(AppError::InvalidInput)?;
         
         self.update_task(id, UpdateTaskRequest {
             title: None,
@@ -508,7 +508,7 @@ impl TaskService {
     }
     
     pub async fn update_progress(&self, id: &str, progress: i32) -> Result<Task, AppError> {
-        if progress < 0 || progress > 100 {
+        if !(0..=100).contains(&progress) {
             return Err(AppError::InvalidInput("Progress must be between 0 and 100".to_string()));
         }
         
@@ -530,7 +530,7 @@ impl TaskService {
             "#,
         )
         .bind(&task.id)
-        .bind(&task.progress)
+        .bind(task.progress)
         .bind(&task.status)
         .bind(&task.completed_at)
         .bind(&task.updated_at)
