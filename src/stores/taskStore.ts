@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { TaskStore, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
 import { TaskService } from '../services/taskService';
+import { LogService } from '../services/logService';
 
 // Create Zustand store
 export const useTaskStore = create<TaskStore>((set, get) => ({
@@ -25,6 +26,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       // Update system tray title
       TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
+      LogService.error('TaskStore.loadTasks error', error);
       set({ error: error as Error, isLoading: false });
     }
   },
@@ -38,8 +40,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         status: taskData.status,
         priority: taskData.priority,
         parentId: taskData.parentId,
-        dueDate: taskData.dueDate,
+        dueDate: taskData.dueDate?.toISOString(),
+        notificationSettings: taskData.notificationSettings,
       };
+
       const newTask = await TaskService.createTask(createRequest);
       const parsedTask = {
         ...newTask,
@@ -48,33 +52,38 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         completedAt: newTask.completedAt ? new Date(newTask.completedAt) : undefined,
         dueDate: newTask.dueDate ? new Date(newTask.dueDate) : undefined,
       };
-      // Only add to the main task list if it's a root task (no parent)
-      if (!parsedTask.parentId) {
-        set((state) => ({
+
+      // Only add to state if it's a root task (no parent)
+      if (!taskData.parentId) {
+        set(state => ({
           tasks: [...state.tasks, parsedTask],
-          isLoading: false
+          isLoading: false,
         }));
       } else {
         set({ isLoading: false });
       }
+      
       // Update system tray title
       TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
+      console.error('TaskStore.addTask error:', error);
       set({ error: error as Error, isLoading: false });
     }
   },
   
-  updateTask: async (id, updates) => {
+  updateTask: async (id, updateData) => {
     set({ isLoading: true, error: null });
     try {
       const updateRequest: UpdateTaskRequest = {
-        title: updates.title,
-        description: updates.description,
-        status: updates.status,
-        priority: updates.priority,
-        parentId: updates.parentId,
-        dueDate: updates.dueDate,
+        title: updateData.title,
+        description: updateData.description,
+        status: updateData.status,
+        priority: updateData.priority,
+        parentId: updateData.parentId,
+        dueDate: updateData.dueDate?.toISOString(),
+        notificationSettings: updateData.notificationSettings,
       };
+
       const updatedTask = await TaskService.updateTask(id, updateRequest);
       const parsedTask = {
         ...updatedTask,
@@ -83,15 +92,16 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         completedAt: updatedTask.completedAt ? new Date(updatedTask.completedAt) : undefined,
         dueDate: updatedTask.dueDate ? new Date(updatedTask.dueDate) : undefined,
       };
-      set((state) => ({
-        tasks: state.tasks.map((task) =>
-          task.id === id ? parsedTask : task
-        ),
-        isLoading: false
+
+      set(state => ({
+        tasks: state.tasks.map(task => task.id === id ? parsedTask : task),
+        isLoading: false,
       }));
+      
       // Update system tray title
       TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
+      console.error('TaskStore.updateTask error:', error);
       set({ error: error as Error, isLoading: false });
     }
   },
@@ -100,42 +110,47 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await TaskService.deleteTask(id);
-      set((state) => ({
-        tasks: state.tasks.filter((task) => task.id !== id),
-        isLoading: false
+      set(state => ({
+        tasks: state.tasks.filter(task => task.id !== id),
+        isLoading: false,
       }));
+      
       // Update system tray title
       TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
+      console.error('TaskStore.deleteTask error:', error);
       set({ error: error as Error, isLoading: false });
     }
   },
   
-  moveTask: async (id, newStatus) => {
+  moveTask: async (taskId, newStatus) => {
     set({ isLoading: true, error: null });
     try {
-      const updatedTask = await TaskService.moveTask(id, newStatus);
-      const parsedTask = {
-        ...updatedTask,
-        createdAt: new Date(updatedTask.createdAt),
-        updatedAt: new Date(updatedTask.updatedAt),
-        completedAt: updatedTask.completedAt ? new Date(updatedTask.completedAt) : undefined,
-        dueDate: updatedTask.dueDate ? new Date(updatedTask.dueDate) : undefined,
-      };
-      set((state) => ({
-        tasks: state.tasks.map((task) =>
-          task.id === id ? parsedTask : task
-        ),
-        isLoading: false
-      }));
+      await TaskService.moveTask(taskId, newStatus);
+      
+      // Find the task and update its status
+      const state = get();
+      const taskToUpdate = state.tasks.find(task => task.id === taskId);
+      if (taskToUpdate) {
+        const updatedTask = { ...taskToUpdate, status: newStatus };
+        set({
+          tasks: state.tasks.map(task => task.id === taskId ? updatedTask : task),
+          isLoading: false,
+        });
+      } else {
+        set({ isLoading: false });
+      }
+      
       // Update system tray title
       TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
+      console.error('TaskStore.moveTask error:', error);
       set({ error: error as Error, isLoading: false });
     }
   },
-  
+
+  // Get tasks by status
   getTasksByStatus: (status) => {
-    return get().tasks.filter((task) => task.status === status);
+    return get().tasks.filter(task => task.status === status);
   },
 }));

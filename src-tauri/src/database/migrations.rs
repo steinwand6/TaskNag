@@ -94,5 +94,62 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
     .await
     .ok();
     
+    // Add notification columns for new notification system
+    sqlx::query(
+        r#"
+        ALTER TABLE tasks ADD COLUMN notification_type TEXT DEFAULT 'none' CHECK(notification_type IN ('none', 'due_date_based', 'recurring'))
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok(); // Ignore error if column already exists
+    
+    sqlx::query(
+        r#"
+        ALTER TABLE tasks ADD COLUMN notification_days_before INTEGER DEFAULT NULL
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok();
+    
+    sqlx::query(
+        r#"
+        ALTER TABLE tasks ADD COLUMN notification_time TEXT DEFAULT NULL
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok();
+    
+    sqlx::query(
+        r#"
+        ALTER TABLE tasks ADD COLUMN notification_days_of_week TEXT DEFAULT NULL
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok();
+    
+    sqlx::query(
+        r#"
+        ALTER TABLE tasks ADD COLUMN notification_level INTEGER DEFAULT 1 CHECK(notification_level IN (1, 2, 3))
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok();
+    
+    // Create indexes for notification queries
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_notification_type ON tasks(notification_type)")
+        .execute(pool)
+        .await
+        .ok();
+    
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_status_notification ON tasks(status, notification_type)")
+        .execute(pool)
+        .await
+        .ok();
+    
     Ok(())
 }

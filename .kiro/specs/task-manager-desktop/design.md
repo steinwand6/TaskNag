@@ -124,13 +124,12 @@ src-tauri/
 
 ```
 ┌─────────────────────────────────┐
-│ [🔴] High Priority     [⋮]      │
+│ Task Title                  [⋮]  │
 │                                  │
-│ Task Title                       │
 │ ▶ 2 subtasks (1/2 completed)    │
 │                                  │
 │ 📅 Due: 2025-01-15 16:00        │
-│ 🔔 Level 2 (Sound)              │
+│ 🔔 期日3日前 09:00 (Level 2)    │
 │ 🏷 #work #urgent                │
 │                                  │
 │ [━━━━━━────] 60%                │
@@ -145,9 +144,13 @@ src-tauri/
 ├─────────────────────────────────┤
 │ Title: [___________________]    │
 │                                  │
-│ Priority: [●Low ○Med ○High]     │
 │ Due: [Today ▼] [16:00]         │
 │ Tags: [___________________]     │
+│                                  │
+│ Notification: [None ▼]          │
+│ ├ 期日ベース: [3]日前 [09:00]   │
+│ └ 定期: [月火水▼] [09:00]       │
+│ Level: [●Lv1 ○Lv2 ○Lv3]       │
 │                                  │
 │ ☐ Create as recurring task      │
 │                                  │
@@ -265,7 +268,10 @@ async fn resume_recurring_task(id: String) -> Result<(), String>
 
 // Notifications
 #[tauri::command]
-async fn update_notification_settings(settings: NotificationSettings) -> Result<(), String>
+async fn update_task_notification_settings(id: String, settings: TaskNotificationSettings) -> Result<(), String>
+
+#[tauri::command]
+async fn check_notifications() -> Result<Vec<TaskNotification>, String>
 
 #[tauri::command]
 async fn test_notification(level: NotificationLevel) -> Result<(), String>

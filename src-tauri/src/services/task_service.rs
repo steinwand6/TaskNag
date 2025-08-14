@@ -17,6 +17,9 @@ impl TaskService {
         let now = Utc::now().to_rfc3339();
         let id = Uuid::new_v4().to_string();
         
+        // 通知設定のデフォルト値またはリクエストの値を使用
+        let notification_settings = request.notification_settings.unwrap_or_default();
+        
         let task = Task {
             id: id.clone(),
             title: request.title,
@@ -28,13 +31,25 @@ impl TaskService {
             completed_at: None,
             created_at: now.clone(),
             updated_at: now,
-            progress: Some(0), // デフォルトは0%
+            progress: Some(0),
+            // 新通知設定フィールド
+            notification_type: Some(notification_settings.notification_type),
+            notification_days_before: notification_settings.days_before,
+            notification_time: notification_settings.notification_time,
+            notification_days_of_week: notification_settings.days_of_week.map(|days| 
+                serde_json::to_string(&days).unwrap_or_default()
+            ),
+            notification_level: Some(notification_settings.level),
         };
         
         sqlx::query(
             r#"
-            INSERT INTO tasks (id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            INSERT INTO tasks (
+                id, title, description, status, priority, parent_id, due_date, completed_at, 
+                created_at, updated_at, progress, notification_type, notification_days_before, 
+                notification_time, notification_days_of_week, notification_level
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
             "#,
         )
         .bind(&task.id)
@@ -48,6 +63,11 @@ impl TaskService {
         .bind(&task.created_at)
         .bind(&task.updated_at)
         .bind(&task.progress)
+        .bind(&task.notification_type)
+        .bind(&task.notification_days_before)
+        .bind(&task.notification_time)
+        .bind(&task.notification_days_of_week)
+        .bind(&task.notification_level)
         .execute(&self.db.pool)
         .await?;
         
@@ -57,7 +77,7 @@ impl TaskService {
     pub async fn get_tasks(&self) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress
+            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             ORDER BY 
                 CASE status 
@@ -84,7 +104,7 @@ impl TaskService {
     pub async fn get_task_by_id(&self, id: &str) -> Result<Task, AppError> {
         let task = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress
+            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE id = ?1
             "#,
@@ -126,13 +146,26 @@ impl TaskService {
             task.due_date = Some(due_date.to_rfc3339());
         }
         
+        // 通知設定の更新
+        if let Some(notification_settings) = request.notification_settings {
+            task.notification_type = Some(notification_settings.notification_type);
+            task.notification_days_before = notification_settings.days_before;
+            task.notification_time = notification_settings.notification_time;
+            task.notification_days_of_week = notification_settings.days_of_week.map(|days| 
+                serde_json::to_string(&days).unwrap_or_default()
+            );
+            task.notification_level = Some(notification_settings.level);
+        }
+        
         task.updated_at = Utc::now().to_rfc3339();
         
         sqlx::query(
             r#"
             UPDATE tasks
             SET title = ?2, description = ?3, status = ?4, priority = ?5, 
-                parent_id = ?6, due_date = ?7, completed_at = ?8, updated_at = ?9, progress = ?10
+                parent_id = ?6, due_date = ?7, completed_at = ?8, updated_at = ?9, progress = ?10,
+                notification_type = ?11, notification_days_before = ?12, notification_time = ?13,
+                notification_days_of_week = ?14, notification_level = ?15
             WHERE id = ?1
             "#,
         )
@@ -146,6 +179,11 @@ impl TaskService {
         .bind(&task.completed_at)
         .bind(&task.updated_at)
         .bind(&task.progress)
+        .bind(&task.notification_type)
+        .bind(&task.notification_days_before)
+        .bind(&task.notification_time)
+        .bind(&task.notification_days_of_week)
+        .bind(&task.notification_level)
         .execute(&self.db.pool)
         .await?;
         
@@ -168,7 +206,7 @@ impl TaskService {
     pub async fn get_tasks_by_status(&self, status: &str) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress
+            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE status = ?1
             ORDER BY 
@@ -202,6 +240,7 @@ impl TaskService {
             priority: None,
             parent_id: None,
             due_date: None,
+            notification_settings: None,
         }).await
     }
     
@@ -223,7 +262,7 @@ impl TaskService {
     pub async fn get_children(&self, parent_id: &str) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress
+            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE parent_id = ?1
             ORDER BY created_at ASC
@@ -334,7 +373,7 @@ impl TaskService {
     pub async fn get_root_tasks(&self) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress
+            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE parent_id IS NULL
             ORDER BY 
@@ -357,5 +396,100 @@ impl TaskService {
         .await?;
         
         Ok(tasks)
+    }
+    
+    // 新しい通知システム
+    pub async fn check_notifications(&self) -> Result<Vec<crate::models::TaskNotification>, AppError> {
+        use chrono::{DateTime, Utc, Weekday, Datelike};
+        
+        let tasks = sqlx::query_as::<_, Task>(
+            r#"
+            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            FROM tasks
+            WHERE status != 'done' 
+              AND notification_type IS NOT NULL 
+              AND notification_type != 'none'
+            "#,
+        )
+        .fetch_all(&self.db.pool)
+        .await?;
+        
+        let mut notifications = Vec::new();
+        let now = Utc::now();
+        
+        for task in tasks {
+            let notification_type = task.notification_type.as_deref().unwrap_or("none");
+            
+            match notification_type {
+                "due_date_based" => {
+                    if let Some(due_date_str) = &task.due_date {
+                        if let Ok(due_date) = DateTime::parse_from_rfc3339(due_date_str) {
+                            let due_date_utc = due_date.with_timezone(&Utc);
+                            let days_until_due = (due_date_utc - now).num_days();
+                            let days_before = task.notification_days_before.unwrap_or(1);
+                            
+                            // 期日ベース通知の判定
+                            if days_until_due <= days_before as i64 && days_until_due >= 0 {
+                                if let Some(time_str) = &task.notification_time {
+                                    if should_notify_at_time(&now, time_str) {
+                                        notifications.push(crate::models::TaskNotification {
+                                            task_id: task.id,
+                                            title: task.title,
+                                            level: task.notification_level.unwrap_or(1),
+                                            days_until_due: Some(days_until_due),
+                                            notification_type: "due_date_based".to_string(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "recurring" => {
+                    // 定期通知の判定
+                    if let (Some(days_str), Some(time_str)) = (&task.notification_days_of_week, &task.notification_time) {
+                        if let Ok(days_of_week) = serde_json::from_str::<Vec<i32>>(days_str) {
+                            let current_weekday = match now.weekday() {
+                                Weekday::Sun => 0,
+                                Weekday::Mon => 1,
+                                Weekday::Tue => 2,
+                                Weekday::Wed => 3,
+                                Weekday::Thu => 4,
+                                Weekday::Fri => 5,
+                                Weekday::Sat => 6,
+                            };
+                            
+                            if days_of_week.contains(&current_weekday) && should_notify_at_time(&now, time_str) {
+                                notifications.push(crate::models::TaskNotification {
+                                    task_id: task.id,
+                                    title: task.title,
+                                    level: task.notification_level.unwrap_or(1),
+                                    days_until_due: None,
+                                    notification_type: "recurring".to_string(),
+                                });
+                            }
+                        }
+                    }
+                },
+                _ => {} // 'none' or unknown type
+            }
+        }
+        
+        Ok(notifications)
+    }
+}
+
+// 指定時刻での通知判定（±30秒の範囲）
+fn should_notify_at_time(now: &chrono::DateTime<chrono::Utc>, time_str: &str) -> bool {
+    use chrono::{NaiveTime, Timelike};
+    if let Ok(target_time) = NaiveTime::parse_from_str(time_str, "%H:%M") {
+        let current_time = now.time();
+        let target_seconds = target_time.num_seconds_from_midnight();
+        let current_seconds = current_time.num_seconds_from_midnight();
+        
+        // ±30秒の範囲で通知
+        (current_seconds as i32 - target_seconds as i32).abs() <= 30
+    } else {
+        false
     }
 }

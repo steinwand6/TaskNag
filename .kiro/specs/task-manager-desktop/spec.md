@@ -27,10 +27,10 @@
   - `done`: 完了タスク
 
 #### Notification System
-- **Notification Levels**:
-  1. **Level 1**: システム通知のみ
-  2. **Level 2**: システム通知 + 音声通知
-  3. **Level 3**: アプリケーション最大化 + 通知
+- **個別通知設定**: タスクごとに通知タイミングをカスタマイズ可能
+- **期日ベース通知**: 「期日N日前」から期日まで連続通知
+- **定期通知**: 曜日・時刻指定での定期リマインド
+- **通知タイミング**: 分単位での精密な時刻設定
 
 #### System Integration
 - **System Tray**: バックグラウンド常駐
@@ -46,11 +46,10 @@ struct Task {
     title: String,
     description: Option<String>,
     status: TaskStatus,
-    priority: Priority,
     created_at: DateTime,
     updated_at: DateTime,
     due_date: Option<DateTime>,
-    notification_level: NotificationLevel,
+    notification_settings: NotificationSettings, // 個別通知設定
     tags: Vec<String>,
     completed_at: Option<DateTime>,
     parent_task_id: Option<Uuid>,  // 親タスクのID
@@ -66,17 +65,16 @@ enum TaskStatus {
     Done,
 }
 
-enum Priority {
-    Low,
-    Medium,
-    High,
-    Critical,
-}
-
-enum NotificationLevel {
-    SystemOnly,
-    SystemWithSound,
-    MaximizeApp,
+enum NotificationSettings {
+    None,                              // 通知なし
+    DueDateBased {
+        days_before: u8,               // 期日何日前から通知開始
+        notification_time: NaiveTime,  // 通知時刻
+    },
+    Recurring {
+        days_of_week: Vec<DayOfWeek>,  // 通知する曜日
+        notification_time: NaiveTime,  // 通知時刻
+    },
 }
 
 struct RecurrenceRule {
@@ -111,14 +109,16 @@ CREATE TABLE tasks (
     title TEXT NOT NULL,
     description TEXT,
     status TEXT NOT NULL CHECK (status IN ('inbox', 'todo', 'in_progress', 'done')),
-    priority TEXT NOT NULL DEFAULT 'medium',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     due_date DATETIME,
-    notification_level INTEGER DEFAULT 1,
+    notification_type TEXT DEFAULT 'none' CHECK (notification_type IN ('none', 'due_date_based', 'recurring')),
+    notification_days_before INTEGER DEFAULT NULL, -- 期日何日前から通知
+    notification_time TIME DEFAULT NULL,           -- 通知時刻
+    notification_days_of_week TEXT DEFAULT NULL,   -- 定期通知の曜日（JSON配列）
     completed_at DATETIME,
     parent_task_id TEXT,
-    progress REAL DEFAULT 0.0 CHECK (progress >= 0 AND progress <= 1),
+    progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
     FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
 

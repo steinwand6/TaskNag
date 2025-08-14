@@ -4,6 +4,8 @@ pub mod error;
 pub mod models;
 pub mod services;
 
+pub mod tests;
+
 use database::Database;
 use services::TaskService;
 use tauri::{
@@ -132,11 +134,15 @@ pub fn run() {
       commands::task_commands::get_incomplete_task_count,
       commands::task_commands::update_tray_title,
       commands::task_commands::check_notifications,
+      commands::task_commands::update_task_notification_settings,
       commands::task_commands::get_children,
       commands::task_commands::get_task_with_children,
       commands::task_commands::update_progress,
       commands::task_commands::calculate_and_update_progress,
       commands::task_commands::get_root_tasks,
+      commands::log_commands::write_log,
+      commands::log_commands::get_log_file_path,
+      commands::log_commands::read_recent_logs,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

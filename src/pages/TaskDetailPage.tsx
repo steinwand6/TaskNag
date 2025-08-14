@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Task } from '../types/Task';
 import { TaskService } from '../services/taskService';
 import { SubTaskList } from '../components/SubTaskList';
-import { ProgressBar } from '../components/ProgressBar';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 export const TaskDetailPage: React.FC = () => {
@@ -180,6 +179,23 @@ export const TaskDetailPage: React.FC = () => {
                 </div>
               </div>
             </div>
+            
+            {/* 通知設定表示 */}
+            {task.notificationSettings && task.notificationSettings.notificationType !== 'none' && (
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">通知設定</h3>
+                <div className="text-gray-900">
+                  {task.notificationSettings.notificationType === 'due_date_based' ? (
+                    <span>📅 期日{task.notificationSettings.daysBefore}日前 {task.notificationSettings.notificationTime}に通知</span>
+                  ) : task.notificationSettings.notificationType === 'recurring' ? (
+                    <span>🔔 定期通知 {task.notificationSettings.notificationTime}</span>
+                  ) : null}
+                  <span className="ml-2 text-sm text-gray-600">
+                    (Level {task.notificationSettings.level})
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 進捗・子タスク管理 */}

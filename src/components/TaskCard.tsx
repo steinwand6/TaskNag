@@ -20,12 +20,40 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const [editTask, setEditTask] = React.useState<Task | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   
-  const getPriorityColor = (priority: Task['priority']) => {
-    switch (priority) {
-      case 'required': return 'border-l-red-600';
-      case 'high': return 'border-l-red-500';
-      case 'medium': return 'border-l-yellow-500';
-      case 'low': return 'border-l-green-500';
+  const getNotificationDisplay = (task: Task) => {
+    if (!task.notificationSettings || task.notificationSettings.notificationType === 'none') {
+      return null;
+    }
+    
+    const { notificationSettings } = task;
+    
+    if (notificationSettings.notificationType === 'due_date_based' && task.dueDate) {
+      return (
+        <span className="text-xs text-blue-600">
+          🔔 期日{notificationSettings.daysBefore}日前
+        </span>
+      );
+    } else if (notificationSettings.notificationType === 'recurring') {
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+      const days = notificationSettings.daysOfWeek?.map(d => dayNames[d]).join('') || '';
+      return (
+        <span className="text-xs text-green-600">
+          🔔 {days}
+        </span>
+      );
+    }
+    return null;
+  };
+  
+  const getBorderColor = () => {
+    // 通知レベルに応じて色を変える
+    if (!task.notificationSettings || task.notificationSettings.notificationType === 'none') {
+      return 'border-l-gray-300';
+    }
+    switch (task.notificationSettings.level) {
+      case 3: return 'border-l-red-500';
+      case 2: return 'border-l-yellow-500';
+      case 1: return 'border-l-blue-500';
       default: return 'border-l-gray-300';
     }
   };
@@ -107,7 +135,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   return (
     <>
       <div 
-        className={`bg-white p-3 rounded-lg border-l-4 ${getPriorityColor(task.priority)} shadow-sm hover:shadow-md transition-shadow cursor-move select-none ${
+        className={`bg-white p-3 rounded-lg border-l-4 ${getBorderColor()} shadow-sm hover:shadow-md transition-shadow cursor-move select-none ${
           isDragging ? 'opacity-50 scale-105' : ''
         }`}
         onDoubleClick={handleDoubleClick}
@@ -140,7 +168,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
         
         <div className="flex justify-between items-center text-xs text-gray-500">
-          <span className="capitalize">{task.priority}</span>
+          {getNotificationDisplay(task) || <span className="text-gray-400">通知なし</span>}
           {task.dueDate && (
             <span className="text-orange-600">
               📅 {formatDate(task.dueDate)}

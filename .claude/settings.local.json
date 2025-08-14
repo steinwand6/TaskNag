@@ -42,7 +42,10 @@
       "Bash(npm run build:*)",
       "Bash(npx eslint:*)",
       "Bash(cargo --version)",
-      "Bash(cargo clean:*)"
+      "Bash(cargo clean:*)",
+      "Bash(npm install:*)",
+      "Bash(find:*)",
+      "Bash(cargo:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,6 +9,8 @@ import { LoadingIndicator } from './components/LoadingIndicator';
 import { STATUS_CONFIG, VISIBLE_STATUSES } from './constants';
 import { useModal, useDragAndDrop, useNotifications } from './hooks';
 
+import { LogService } from './services/logService';
+
 function App() {
   const { getTasksByStatus, moveTask, loadTasks, isLoading, error } = useTaskStore();
   
@@ -22,6 +24,7 @@ function App() {
 
   // Load tasks on component mount
   React.useEffect(() => {
+    LogService.info('アプリ', 'TaskNagアプリケーションが起動しました');
     loadTasks();
   }, [loadTasks]);
 
@@ -87,6 +90,8 @@ function App() {
           initialStatus={modalInitialStatus}
         />
       )}
+      
+
     </div>
   );
 }

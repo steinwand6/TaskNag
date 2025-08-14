@@ -105,75 +105,98 @@ pub async fn check_notifications(
     app: AppHandle,
     service: State<'_, TaskService>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let tasks = service.get_tasks().await.map_err(|e| e.to_string())?;
-    let mut notifications = Vec::new();
+    let notifications = service.check_notifications().await.map_err(|e| e.to_string())?;
+    let mut result = Vec::new();
     
-    let now = chrono::Utc::now();
-    
-    for task in tasks {
-        // 完了済みタスクはスキップ
-        if task.status == "done" {
-            continue;
-        }
-        
-        // 期限がないタスクはスキップ
-        let due_date = match &task.due_date {
-            Some(date_str) => {
-                match chrono::DateTime::parse_from_rfc3339(date_str) {
-                    Ok(date) => date.with_timezone(&chrono::Utc),
-                    Err(_) => continue,
-                }
+    for notification in notifications {
+        // 通知レベルに応じて通知を送信
+        let (title, body) = match notification.notification_type.as_str() {
+            "due_date_based" => {
+                let days_text = match notification.days_until_due.unwrap_or(0) {
+                    0 => "【期限当日】",
+                    1 => "【期限明日】",
+                    d if d <= 3 => "【期限間近】",
+                    _ => "【期限通知】",
+                };
+                (
+                    format!("📅 {}", days_text),
+                    notification.title.clone()
+                )
             },
-            None => continue,
+            "recurring" => {
+                (
+                    "🔔 定期リマインド".to_string(),
+                    notification.title.clone()
+                )
+            },
+            _ => (
+                "📋 タスク通知".to_string(),
+                notification.title.clone()
+            )
         };
         
-        let days_until_due = (due_date - now).num_days();
-        
-        let (level, should_notify) = match days_until_due {
-            d if d <= 0 && task.priority == "required" => (1, true),  // 期限当日または過ぎている（必須のみレベル1）
-            d if d <= 0 => (2, true),  // 期限当日または過ぎている（その他）
-            1 => (2, true),            // 1日前（重要）
-            2..=3 => (3, true),        // 2-3日前（注意）
-            _ => (0, false),           // まだ通知不要
-        };
-        
-        if should_notify {
-            let priority_emoji = match task.priority.as_str() {
-                "required" => "🚨",
-                "high" => "⚠️",
-                "medium" => "📋",
-                "low" => "📝",
-                _ => "📋",
-            };
-            
-            let level_text = match level {
-                1 => "【期限当日】",
-                2 => "【期限明日】", 
-                3 => "【期限間近】",
-                _ => "",
-            };
-            
-            let title = format!("{} {}", priority_emoji, level_text);
-            let body = format!("{}\n期限: {}", task.title, due_date.format("%m/%d %H:%M"));
-            
-            // 通知プラグインを使用して通知を送信
-            let _ = app.emit("notification", serde_json::json!({
-                "title": title.clone(),
-                "body": body
-            }));
-            
-            // 通知情報を記録
-            notifications.push(serde_json::json!({
-                "taskId": task.id,
-                "title": task.title,
-                "level": level,
-                "daysUntilDue": days_until_due,
-                "priority": task.priority
-            }));
+        // 通知レベルに応じた処理（Level 1-3）
+        match notification.level {
+            1 => {
+                // Level 1: システム通知のみ
+                let _ = app.emit("notification", serde_json::json!({
+                    "title": title,
+                    "body": body
+                }));
+            },
+            2 => {
+                // Level 2: システム通知 + 音声通知
+                let _ = app.emit("notification", serde_json::json!({
+                    "title": title,
+                    "body": body
+                }));
+                let _ = app.emit("sound_notification", serde_json::json!({}));
+            },
+            3 => {
+                // Level 3: アプリ最大化 + 通知
+                let _ = app.emit("notification", serde_json::json!({
+                    "title": title,
+                    "body": body
+                }));
+                let _ = app.emit("sound_notification", serde_json::json!({}));
+                let _ = app.emit("maximize_app", serde_json::json!({}));
+            },
+            _ => {} // Invalid level
         }
+        
+        // 通知情報を記録
+        result.push(serde_json::json!({
+            "taskId": notification.task_id,
+            "title": notification.title,
+            "level": notification.level,
+            "daysUntilDue": notification.days_until_due,
+            "notificationType": notification.notification_type
+        }));
     }
     
-    Ok(notifications)
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn update_task_notification_settings(
+    id: String,
+    notification_settings: crate::models::TaskNotificationSettings,
+    service: State<'_, TaskService>,
+) -> Result<Task, String> {
+    let update_request = crate::models::UpdateTaskRequest {
+        title: None,
+        description: None,
+        status: None,
+        priority: None,
+        parent_id: None,
+        due_date: None,
+        notification_settings: Some(notification_settings),
+    };
+    
+    service
+        .update_task(&id, update_request)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

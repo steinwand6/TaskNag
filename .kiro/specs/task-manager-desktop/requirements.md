@@ -28,23 +28,24 @@
   - ショートカットキーでステータス変更可能
   - ステータス変更時にタイムスタンプを記録
 
-#### FR-003: Task Priority
-- **Description**: タスクに優先度を設定できる
+#### FR-003: Custom Notification Settings
+- **Description**: タスクごとに個別の通知設定が可能
 - **Priority**: High
-- **Levels**:
-  - Low (緑)
-  - Medium (黄) - デフォルト
-  - High (橙)
-  - Critical (赤)
+- **Notification Types**:
+  - None: 通知なし（デフォルト）
+  - Due Date Based: 期日N日前から期日まで連続通知
+  - Recurring: 曜日・時刻指定での定期リマインド
 - **Acceptance Criteria**:
-  - 視覚的に優先度が識別できる
-  - 優先度でソート可能
+  - 期日ベース通知では通知開始日数と時刻を設定可能
+  - 定期通知では曜日（複数選択可）と時刻（時・分）を設定可能
+  - 期限なしタスクでも定期通知は有効
+  - タスク作成時・詳細画面で設定可能
 
 #### FR-004: Task Editing
 - **Description**: 既存タスクを編集できる
 - **Priority**: High
 - **Acceptance Criteria**:
-  - タイトル、説明、優先度、期限を変更可能
+  - タイトル、説明、通知設定、期限を変更可能
   - 更新日時が自動記録される
   - 編集中の自動保存機能
 
@@ -103,32 +104,42 @@
 
 ### 1.2 Notification System
 
-#### FR-010: Notification Levels
-- **Description**: 3段階の通知レベルを設定できる
+#### FR-010: Custom Notification Settings (Revised)
+- **Description**: タスクごとに詳細な通知設定が可能
 - **Priority**: High
-- **Levels**:
-  1. システム通知のみ
-  2. システム通知 + 音声通知
-  3. アプリ最大化 + 通知
+- **Setting Types**:
+  - **None**: 通知なし（デフォルト）
+  - **Due Date Based**: 期日N日前から期日まで毎日通知
+  - **Recurring**: 指定曜日・時刻での定期通知
+- **Notification Levels**:
+  - **Level 1**: システム通知のみ
+  - **Level 2**: システム通知 + 音声通知
+  - **Level 3**: アプリケーション最大化 + 通知
 - **Acceptance Criteria**:
-  - タスクごとに通知レベル設定可能
-  - デフォルト通知レベルの設定可能
+  - 期日ベース：開始日数（1-30日前）と通知時刻を設定
+  - 定期通知：曜日（複数選択）と時刻（時・分）を設定
+  - 通知レベルをタスクごとに個別設定可能
+  - 期限なしタスクでも定期通知は機能
+  - タスク作成時と詳細画面で設定可能
+  - 通知頻度は1分間隔でチェック
 
-#### FR-011: Due Date Notifications
-- **Description**: 期限に基づく通知を受け取れる
+#### FR-011: Due Date Notifications (Updated)
+- **Description**: 期日ベース通知の詳細仕様
 - **Priority**: High
 - **Acceptance Criteria**:
-  - 期限前リマインダー（5分、15分、30分、1時間、1日前）
-  - 期限切れ通知
-  - 通知のスヌーズ機能
+  - 設定した日数前から期日当日まで毎日通知
+  - 指定時刻に正確に通知
+  - 同日重複通知の防止機能
+  - 完了済みタスクは通知停止
 
-#### FR-012: Sound Notifications
-- **Description**: 音声による通知を受け取れる
-- **Priority**: Medium
+#### FR-012: Recurring Notifications (New)
+- **Description**: 定期通知の詳細仕様
+- **Priority**: High
 - **Acceptance Criteria**:
-  - カスタム通知音の設定
-  - 音量調整
-  - サイレントモード
+  - 曜日単位での通知設定（月-日の複数選択可）
+  - 時・分での精密な時刻設定
+  - 期限なしタスクでも機能
+  - 月次通知も将来的に対応可能な設計
 
 ### 1.3 Search and Filter
 
@@ -145,7 +156,7 @@
 - **Priority**: High
 - **Filter Criteria**:
   - ステータス
-  - 優先度
+  - 通知設定タイプ
   - タグ
   - 期限（今日、今週、期限切れ）
 - **Acceptance Criteria**:

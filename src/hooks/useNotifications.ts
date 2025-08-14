@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { TaskService } from '../services/taskService';
+import { LogService } from '../services/logService';
 import { TaskNotification } from '../types/Task';
 
 export const useNotifications = () => {
@@ -9,7 +10,7 @@ export const useNotifications = () => {
       console.log('通知チェック完了:', notifications);
       return notifications;
     } catch (error) {
-      console.error('通知チェックエラー:', error);
+      LogService.error('通知チェックエラー', error);
       return [];
     }
   }, []);
@@ -22,7 +23,7 @@ export const useNotifications = () => {
     // 定期チェックの設定
     const interval = setInterval(() => {
       checkNotifications();
-    }, 5 * 60 * 1000); // 5分
+    }, 1 * 60 * 1000); // 1分
 
     return () => clearInterval(interval);
   }, [checkNotifications]);

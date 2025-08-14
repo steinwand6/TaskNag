@@ -1,7 +1,9 @@
 import React from 'react';
-import { Task, TaskStatus, Priority } from '../types/Task';
+import { Task, TaskStatus, Priority, TaskNotificationSettings } from '../types/Task';
+import { NotificationSettings } from './NotificationSettings';
 import { useTaskStore } from '../stores/taskStore';
 import { DEFAULT_TASK_STATUS, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../constants';
+import { LogService } from '../services/logService';
 
 interface EditTaskModalProps {
   isOpen: boolean;
@@ -10,6 +12,11 @@ interface EditTaskModalProps {
 }
 
 export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task }) => {
+  // デバッグ用: onCloseが呼ばれた時のログ
+  const handleClose = () => {
+    LogService.info('モーダル', 'EditTaskModal: onCloseが呼ばれました');
+    onClose();
+  };
   const { updateTask } = useTaskStore();
   const [formData, setFormData] = React.useState({
     title: '',
@@ -17,6 +24,10 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
     priority: 'medium' as Priority,
     status: DEFAULT_TASK_STATUS,
     dueDate: '',
+    notificationSettings: {
+      notificationType: 'none',
+      level: 1,
+    } as TaskNotificationSettings,
   });
   
   // Initialize form data when task changes
@@ -28,12 +39,17 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
         priority: task.priority,
         status: task.status,
         dueDate: task.dueDate ? task.dueDate.toISOString().split('T')[0] : '',
+        notificationSettings: task.notificationSettings || {
+          notificationType: 'none',
+          level: 1,
+        },
       });
     }
   }, [task]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    LogService.info('モーダル', 'EditTaskModal: handleSubmitが呼ばれました');
     if (!formData.title.trim() || !task) return;
     
     updateTask(task.id, {
@@ -42,20 +58,27 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
       priority: formData.priority,
       status: formData.status,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
+      notificationSettings: formData.notificationSettings,
     });
     
-    onClose();
+    handleClose();
+  };
+
+  const handleNotificationChange = (settings: TaskNotificationSettings) => {
+    LogService.info('モーダル', 'EditTaskModal: 通知設定が変更されました', JSON.stringify(settings));
+    setFormData({ ...formData, notificationSettings: settings });
   };
   
   if (!isOpen || !task) return null;
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="p-6 overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">タスクを編集</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600"
           >
             ×
@@ -138,10 +161,19 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
             />
           </div>
           
+          {/* 通知設定セクション */}
+          <div className="border-t pt-4">
+            <NotificationSettings
+              settings={formData.notificationSettings}
+              onChange={handleNotificationChange}
+              hasDueDate={!!formData.dueDate}
+            />
+          </div>
+          
           <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-gray-600 hover:text-gray-800"
             >
               キャンセル
@@ -154,6 +186,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

@@ -72,6 +72,38 @@ impl std::str::FromStr for Priority {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskNotificationSettings {
+    pub notification_type: String,           // 'none', 'due_date_based', 'recurring'
+    pub days_before: Option<i32>,            // 期日何日前から
+    pub notification_time: Option<String>,   // HH:MM形式
+    pub days_of_week: Option<Vec<i32>>,      // 0=日曜, 1=月曜...
+    pub level: i32,                          // 1, 2, 3
+}
+
+impl Default for TaskNotificationSettings {
+    fn default() -> Self {
+        Self {
+            notification_type: "none".to_string(),
+            days_before: None,
+            notification_time: None,
+            days_of_week: None,
+            level: 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskNotification {
+    pub task_id: String,
+    pub title: String,
+    pub level: i32,
+    pub days_until_due: Option<i64>,
+    pub notification_type: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
@@ -79,13 +111,19 @@ pub struct Task {
     pub title: String,
     pub description: Option<String>,
     pub status: String,
-    pub priority: String,
+    pub priority: String, // 一時的に保持（段階的移行のため）
     pub parent_id: Option<String>,
     pub due_date: Option<String>,
     pub completed_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-    pub progress: Option<i32>, // 進捗率 (0-100)
+    pub progress: Option<i32>,
+    // 新しい通知設定フィールド
+    pub notification_type: Option<String>,        // 'none', 'due_date_based', 'recurring'
+    pub notification_days_before: Option<i32>,   // 期日何日前から
+    pub notification_time: Option<String>,       // HH:MM形式
+    pub notification_days_of_week: Option<String>, // JSON配列 "[0,1,2]"
+    pub notification_level: Option<i32>,         // 1, 2, 3
 }
 
 impl Task {
@@ -102,7 +140,13 @@ impl Task {
             completed_at: None,
             created_at: now.clone(),
             updated_at: now,
-            progress: Some(0), // デフォルトは0%
+            progress: Some(0),
+            // 新しい通知設定のデフォルト値
+            notification_type: Some("none".to_string()),
+            notification_days_before: None,
+            notification_time: None,
+            notification_days_of_week: None,
+            notification_level: Some(1),
         }
     }
 }
@@ -113,9 +157,11 @@ pub struct CreateTaskRequest {
     pub title: String,
     pub description: Option<String>,
     pub status: TaskStatus,
-    pub priority: Priority,
+    pub priority: Priority, // 一時的に保持
     pub parent_id: Option<String>,
     pub due_date: Option<DateTime<Utc>>,
+    // 新しい通知設定フィールド
+    pub notification_settings: Option<TaskNotificationSettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,7 +170,9 @@ pub struct UpdateTaskRequest {
     pub title: Option<String>,
     pub description: Option<String>,
     pub status: Option<TaskStatus>,
-    pub priority: Option<Priority>,
+    pub priority: Option<Priority>, // 一時的に保持
     pub parent_id: Option<String>,
     pub due_date: Option<DateTime<Utc>>,
+    // 新しい通知設定フィールド
+    pub notification_settings: Option<TaskNotificationSettings>,
 }
