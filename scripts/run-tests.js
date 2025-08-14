@@ -153,9 +153,14 @@ function validateProjectStructure() {
   const requiredFiles = [
     'src-tauri/Cargo.toml',
     'src-tauri/src/lib.rs',
-    'src-tauri/src/commands/test_commands.rs',
+    'src-tauri/src/commands/task_commands.rs',
+    'src-tauri/src/commands/log_commands.rs',
     'src-tauri/src/tests/mock_database.rs',
     'src-tauri/src/tests/notification_tests.rs',
+    'src-tauri/src/tests/task_crud_tests.rs',
+    'src-tauri/src/tests/hierarchical_task_tests.rs',
+    'src-tauri/src/tests/notification_system_tests.rs',
+    'src-tauri/src/tests/error_handling_tests.rs',
     'package.json',
     'src/App.tsx'
   ];
@@ -204,17 +209,49 @@ async function runAllTests(testType = 'all') {
       return results;
     }
 
-    // 3. モックテスト実行
+    // 3. 包括的テストスイート実行
     if (testType === 'mock' || testType === 'all') {
-      const mockResult = await runCargoTest('notification_tests');
-      results.mockTests = mockResult.success;
+      log(`🧪 [${formatTime()}] 包括的テストスイート実行中...`, 'blue');
       
-      if (mockResult.success) {
-        log(`📊 モックテスト結果:`, 'green');
-        console.log(mockResult.stdout);
+      const testSuites = [
+        'notification_tests',
+        'task_crud_tests', 
+        'hierarchical_task_tests',
+        'notification_system_tests',
+        'error_handling_tests'
+      ];
+      
+      let allTestsPassed = true;
+      let totalResults = [];
+      
+      for (const testSuite of testSuites) {
+        const testResult = await runCargoTest(testSuite);
+        
+        if (testResult.success) {
+          log(`✅ [${formatTime()}] ${testSuite} PASSED`, 'green');
+          totalResults.push(`✅ ${testSuite}: PASSED`);
+        } else {
+          log(`❌ [${formatTime()}] ${testSuite} FAILED`, 'red');
+          totalResults.push(`❌ ${testSuite}: FAILED`);
+          allTestsPassed = false;
+          
+          // Show error details for failed tests
+          if (testResult.stderr) {
+            log(`📊 ${testSuite} エラー詳細:`, 'red');
+            console.log(testResult.stderr);
+          }
+        }
+      }
+      
+      results.mockTests = allTestsPassed;
+      
+      log(`📊 テストスイート結果サマリー:`, allTestsPassed ? 'green' : 'red');
+      totalResults.forEach(result => console.log(`  ${result}`));
+      
+      if (allTestsPassed) {
+        log(`🎉 [${formatTime()}] 全テストスイート成功！`, 'green');
       } else {
-        log(`📊 モックテスト失敗:`, 'red');
-        console.log(mockResult.stderr);
+        log(`⚠️  [${formatTime()}] 一部テストスイートに失敗があります`, 'yellow');
       }
     }
 
