@@ -6,9 +6,10 @@ interface HeaderProps {
   onRefresh: () => void;
   showDone: boolean;
   onToggleDone: () => void;
+  onManageTags?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ isLoading, onNewTask, onRefresh, showDone, onToggleDone }) => {
+export const Header: React.FC<HeaderProps> = ({ isLoading, onNewTask, onRefresh, showDone, onToggleDone, onManageTags }) => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -22,6 +23,15 @@ export const Header: React.FC<HeaderProps> = ({ isLoading, onNewTask, onRefresh,
             </p>
           </div>
           <div className="flex items-center space-x-4">
+            {onManageTags && (
+              <button 
+                onClick={onManageTags}
+                className="px-3 py-2 text-sm rounded-md bg-purple-100 text-purple-800 border border-purple-300 hover:bg-purple-200 transition-colors"
+                disabled={isLoading}
+              >
+                🏷️ タグ管理
+              </button>
+            )}
             <button 
               onClick={onToggleDone}
               className={`px-3 py-2 text-sm rounded-md transition-colors ${

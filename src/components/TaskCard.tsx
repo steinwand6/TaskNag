@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Task, TaskStatus } from '../types/Task';
 import { useTaskStore } from '../stores/taskStore';
 import { EditTaskModal } from './EditTaskModal';
+import { TagDisplay } from './TagDisplay';
 
 interface TaskCardProps {
   task: Task;
@@ -166,6 +167,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </p>
         )}
 
+        {/* タグ表示 */}
+        {task.tags && task.tags.length > 0 && (
+          <div className="mb-2">
+            <TagDisplay tags={task.tags} maxDisplay={2} size="sm" />
+          </div>
+        )}
         
         <div className="flex justify-between items-center text-xs text-gray-500">
           {getNotificationDisplay(task) || <span className="text-gray-400">通知なし</span>}

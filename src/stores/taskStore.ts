@@ -6,6 +6,7 @@ import { LogService } from '../services/logService';
 // Create Zustand store
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
+  tags: [],
   isLoading: false,
   error: null,
   
@@ -14,14 +15,36 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const tasks = await TaskService.getRootTasks();
+      
+      // タスクごとにタグ情報を取得
+      const tasksWithTags = await Promise.all(
+        tasks.map(async (task) => {
+          try {
+            const tags = await TaskService.getTagsForTask(task.id);
+            return {
+              ...task,
+              tags: tags.map(tag => ({
+                ...tag,
+                createdAt: new Date(tag.createdAt),
+                updatedAt: new Date(tag.updatedAt),
+              })),
+            };
+          } catch (error) {
+            LogService.error(`Failed to load tags for task ${task.id}`, error);
+            return { ...task, tags: [] };
+          }
+        })
+      );
+      
       // Convert date strings to Date objects
-      const parsedTasks = tasks.map(task => ({
+      const parsedTasks = tasksWithTags.map(task => ({
         ...task,
         createdAt: new Date(task.createdAt),
         updatedAt: new Date(task.updatedAt),
         completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
         dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
       }));
+      
       set({ tasks: parsedTasks, isLoading: false });
       // Update system tray title
       TaskService.updateTrayTitle().catch(console.error);
@@ -150,5 +173,140 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   // Get tasks by status
   getTasksByStatus: (status) => {
     return get().tasks.filter(task => task.status === status);
+  },
+
+  // タグ関連操作
+  loadTags: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const tags = await TaskService.getAllTags();
+      const parsedTags = tags.map(tag => ({
+        ...tag,
+        createdAt: new Date(tag.createdAt),
+        updatedAt: new Date(tag.updatedAt),
+      }));
+      set({ tags: parsedTags, isLoading: false });
+    } catch (error) {
+      LogService.error('TaskStore.loadTags error', error);
+      set({ error: error as Error, isLoading: false });
+    }
+  },
+
+  createTag: async (tagData) => {
+    set({ isLoading: true, error: null });
+    try {
+      const newTag = await TaskService.createTag(tagData);
+      const parsedTag = {
+        ...newTag,
+        createdAt: new Date(newTag.createdAt),
+        updatedAt: new Date(newTag.updatedAt),
+      };
+      set(state => ({
+        tags: [...state.tags, parsedTag],
+        isLoading: false,
+      }));
+      return parsedTag;
+    } catch (error) {
+      LogService.error('TaskStore.createTag error', error);
+      set({ error: error as Error, isLoading: false });
+      throw error;
+    }
+  },
+
+  updateTag: async (id, updateData) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updatedTag = await TaskService.updateTag(id, updateData);
+      const parsedTag = {
+        ...updatedTag,
+        createdAt: new Date(updatedTag.createdAt),
+        updatedAt: new Date(updatedTag.updatedAt),
+      };
+      set(state => ({
+        tags: state.tags.map(tag => tag.id === id ? parsedTag : tag),
+        isLoading: false,
+      }));
+      return parsedTag;
+    } catch (error) {
+      LogService.error('TaskStore.updateTag error', error);
+      set({ error: error as Error, isLoading: false });
+      throw error;
+    }
+  },
+
+  deleteTag: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await TaskService.deleteTag(id);
+      set(state => ({
+        tags: state.tags.filter(tag => tag.id !== id),
+        isLoading: false,
+      }));
+    } catch (error) {
+      LogService.error('TaskStore.deleteTag error', error);
+      set({ error: error as Error, isLoading: false });
+    }
+  },
+
+  addTagToTask: async (taskId, tagId) => {
+    set({ isLoading: true, error: null });
+    try {
+      await TaskService.addTagToTask(taskId, tagId);
+      // タスクのタグ情報を更新するため、そのタスクのタグを再取得
+      const taskTags = await TaskService.getTagsForTask(taskId);
+      const parsedTags = taskTags.map(tag => ({
+        ...tag,
+        createdAt: new Date(tag.createdAt),
+        updatedAt: new Date(tag.updatedAt),
+      }));
+      
+      set(state => ({
+        tasks: state.tasks.map(task => 
+          task.id === taskId ? { ...task, tags: parsedTags } : task
+        ),
+        isLoading: false,
+      }));
+    } catch (error) {
+      LogService.error('TaskStore.addTagToTask error', error);
+      set({ error: error as Error, isLoading: false });
+    }
+  },
+
+  removeTagFromTask: async (taskId, tagId) => {
+    set({ isLoading: true, error: null });
+    try {
+      await TaskService.removeTagFromTask(taskId, tagId);
+      // タスクのタグ情報を更新するため、そのタスクのタグを再取得
+      const taskTags = await TaskService.getTagsForTask(taskId);
+      const parsedTags = taskTags.map(tag => ({
+        ...tag,
+        createdAt: new Date(tag.createdAt),
+        updatedAt: new Date(tag.updatedAt),
+      }));
+      
+      set(state => ({
+        tasks: state.tasks.map(task => 
+          task.id === taskId ? { ...task, tags: parsedTags } : task
+        ),
+        isLoading: false,
+      }));
+    } catch (error) {
+      LogService.error('TaskStore.removeTagFromTask error', error);
+      set({ error: error as Error, isLoading: false });
+    }
+  },
+
+  getTagsForTask: async (taskId) => {
+    try {
+      const tags = await TaskService.getTagsForTask(taskId);
+      return tags.map(tag => ({
+        ...tag,
+        createdAt: new Date(tag.createdAt),
+        updatedAt: new Date(tag.updatedAt),
+      }));
+    } catch (error) {
+      LogService.error('TaskStore.getTagsForTask error', error);
+      throw error;
+    }
   },
 }));

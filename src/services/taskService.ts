@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Task, TaskStatus, CreateTaskRequest, UpdateTaskRequest, TaskNotification, TaskNotificationSettings } from '../types/Task';
+import { Task, TaskStatus, CreateTaskRequest, UpdateTaskRequest, TaskNotification, TaskNotificationSettings, Tag, CreateTagRequest, UpdateTagRequest } from '../types/Task';
 
 export class TaskService {
   static async createTask(request: CreateTaskRequest): Promise<Task> {
@@ -82,6 +82,54 @@ export class TaskService {
   static async getRootTasks(): Promise<Task[]> {
     const tasks = await invoke<any[]>('get_root_tasks');
     return tasks.map((task: any) => this.mapTaskWithNotificationSettings(task));
+  }
+
+  // タグ関連操作
+  static async getAllTags(): Promise<Tag[]> {
+    const tags = await invoke<any[]>('get_all_tags');
+    return tags.map((tag: any) => this.mapTag(tag));
+  }
+
+  static async getTagById(id: string): Promise<Tag> {
+    const tag = await invoke('get_tag_by_id', { id });
+    return this.mapTag(tag);
+  }
+
+  static async createTag(request: CreateTagRequest): Promise<Tag> {
+    const tag = await invoke('create_tag', { request });
+    return this.mapTag(tag);
+  }
+
+  static async updateTag(id: string, request: UpdateTagRequest): Promise<Tag> {
+    const tag = await invoke('update_tag', { id, request });
+    return this.mapTag(tag);
+  }
+
+  static async deleteTag(id: string): Promise<void> {
+    return await invoke('delete_tag', { id });
+  }
+
+  static async addTagToTask(taskId: string, tagId: string): Promise<void> {
+    return await invoke('add_tag_to_task', { taskId, tagId });
+  }
+
+  static async removeTagFromTask(taskId: string, tagId: string): Promise<void> {
+    return await invoke('remove_tag_from_task', { taskId, tagId });
+  }
+
+  static async getTagsForTask(taskId: string): Promise<Tag[]> {
+    const tags = await invoke<any[]>('get_tags_for_task', { taskId });
+    return tags.map((tag: any) => this.mapTag(tag));
+  }
+
+  private static mapTag(tag: any): Tag {
+    return {
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+      createdAt: new Date(tag.createdAt || tag.created_at),
+      updatedAt: new Date(tag.updatedAt || tag.updated_at),
+    };
   }
 
   private static mapTaskWithNotificationSettings(task: any): Task {

@@ -6,27 +6,32 @@ import { Header } from './components/Header';
 import { KanbanColumn } from './components/KanbanColumn';
 import { ErrorMessage } from './components/ErrorMessage';
 import { LoadingIndicator } from './components/LoadingIndicator';
+import { TagManager } from './components/TagManager';
 import { STATUS_CONFIG, VISIBLE_STATUSES } from './constants';
 import { useModal, useDragAndDrop, useNotifications } from './hooks';
 
 import { LogService } from './services/logService';
 
 function App() {
-  const { getTasksByStatus, moveTask, loadTasks, isLoading, error } = useTaskStore();
+  const { getTasksByStatus, moveTask, loadTasks, loadTags, isLoading, error } = useTaskStore();
   
   // State for showing done tasks
   const [showDone, setShowDone] = React.useState(false);
+  
+  // State for tag manager modal
+  const [showTagManager, setShowTagManager] = React.useState(false);
   
   // Custom hooks
   const { isModalOpen, modalInitialStatus, openModal, closeModal } = useModal();
   const dragAndDropHandlers = useDragAndDrop(moveTask);
   const { } = useNotifications();
 
-  // Load tasks on component mount
+  // Load tasks and tags on component mount
   React.useEffect(() => {
     LogService.info('アプリ', 'TaskNagアプリケーションが起動しました');
     loadTasks();
-  }, [loadTasks]);
+    loadTags();
+  }, [loadTasks, loadTags]);
 
   // Get statuses to display based on showDone state
   const displayStatuses = showDone 
@@ -55,6 +60,7 @@ function App() {
         onRefresh={loadTasks}
         showDone={showDone}
         onToggleDone={() => setShowDone(!showDone)}
+        onManageTags={() => setShowTagManager(true)}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -90,7 +96,11 @@ function App() {
           initialStatus={modalInitialStatus}
         />
       )}
-      
+
+      <TagManager
+        isOpen={showTagManager}
+        onClose={() => setShowTagManager(false)}
+      />
 
     </div>
   );

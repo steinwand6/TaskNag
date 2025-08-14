@@ -1,6 +1,25 @@
 // Task status type
 export type TaskStatus = 'inbox' | 'todo' | 'in_progress' | 'done';
 
+// Tag interfaces
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateTagRequest {
+  name: string;
+  color: string;
+}
+
+export interface UpdateTagRequest {
+  name?: string;
+  color?: string;
+}
+
 // Priority type REMOVED as per .kiro/specs/notification-system-redesign
 // Individual notification settings replace the priority system
 // 新しい通知設定の型定義
@@ -36,6 +55,8 @@ export interface Task {
   progress?: number; // 進捗率 (0-100)
   // 新しい通知設定フィールド
   notificationSettings?: TaskNotificationSettings;
+  // タグシステム
+  tags?: Tag[];
 }
 
 // API Request interfaces
@@ -62,6 +83,7 @@ export interface UpdateTaskRequest {
 // Zustand store interface
 export interface TaskStore {
   tasks: Task[];
+  tags: Tag[];
   isLoading: boolean;
   error: Error | null;
   loadTasks: () => Promise<void>;
@@ -70,4 +92,12 @@ export interface TaskStore {
   deleteTask: (id: string) => Promise<void>;
   moveTask: (id: string, newStatus: TaskStatus) => Promise<void>;
   getTasksByStatus: (status: TaskStatus) => Task[];
+  // タグ関連の操作
+  loadTags: () => Promise<void>;
+  createTag: (tag: CreateTagRequest) => Promise<Tag>;
+  updateTag: (id: string, updates: UpdateTagRequest) => Promise<Tag>;
+  deleteTag: (id: string) => Promise<void>;
+  addTagToTask: (taskId: string, tagId: string) => Promise<void>;
+  removeTagFromTask: (taskId: string, tagId: string) => Promise<void>;
+  getTagsForTask: (taskId: string) => Promise<Tag[]>;
 }
