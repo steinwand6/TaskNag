@@ -122,7 +122,6 @@ function App() {
       <Header 
         isLoading={isLoading}
         onNewTask={() => openModal()}
-        onRefresh={loadTasks}
         showDone={showDone}
         onToggleDone={() => setShowDone(!showDone)}
         onManageTags={() => setShowTagManager(true)}
