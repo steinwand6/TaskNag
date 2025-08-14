@@ -39,6 +39,8 @@ async fn test_basic_task_crud_operations() {
         notification_time: None,
         notification_days_of_week: None,
         notification_level: Some(1),
+        // Tag system
+        tags: None,
     };
     
     let created_task = mock_db.insert_task(task_data.clone()).unwrap();

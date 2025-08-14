@@ -41,6 +41,8 @@ impl TaskService {
                 serde_json::to_string(&days).unwrap_or_default()
             ),
             notification_level: Some(notification_settings.level),
+            // Tag system
+            tags: None,
         };
         
         sqlx::query(
@@ -75,7 +77,7 @@ impl TaskService {
     }
     
     pub async fn get_tasks(&self) -> Result<Vec<Task>, AppError> {
-        let tasks = sqlx::query_as::<_, Task>(
+        let mut tasks = sqlx::query_as::<_, Task>(
             r#"
             SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
@@ -98,11 +100,16 @@ impl TaskService {
         .fetch_all(&self.db.pool)
         .await?;
         
+        // 各タスクにタグ情報を追加
+        for task in &mut tasks {
+            task.tags = self.get_tags_for_task(&task.id).await.ok();
+        }
+        
         Ok(tasks)
     }
     
     pub async fn get_task_by_id(&self, id: &str) -> Result<Task, AppError> {
-        let task = sqlx::query_as::<_, Task>(
+        let mut task = sqlx::query_as::<_, Task>(
             r#"
             SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
@@ -111,14 +118,31 @@ impl TaskService {
         )
         .bind(id)
         .fetch_optional(&self.db.pool)
-        .await?;
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Task with id {} not found", id)))?;
         
-        task.ok_or_else(|| AppError::NotFound(format!("Task with id {} not found", id)))
+        // タグ情報を追加
+        task.tags = self.get_tags_for_task(&task.id).await.ok();
+        
+        Ok(task)
     }
     
     pub async fn update_task(&self, id: &str, request: UpdateTaskRequest) -> Result<Task, AppError> {
-        // Get existing task first
-        let mut task = self.get_task_by_id(id).await?;
+        // トランザクションを開始
+        let mut tx = self.db.pool.begin().await?;
+        
+        // Get existing task first (トランザクション内で実行)
+        let mut task = sqlx::query_as::<_, Task>(
+            r#"
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            FROM tasks
+            WHERE id = ?1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Task with id {} not found", id)))?;
         
         // Update fields if provided
         if let Some(title) = request.title {
@@ -157,7 +181,9 @@ impl TaskService {
         
         task.updated_at = Utc::now().to_rfc3339();
         
-        sqlx::query(
+        // メインのタスクレコードを先に更新
+        println!("UpdateTask: About to update main task record for task {}", task.id);
+        match sqlx::query(
             r#"
             UPDATE tasks
             SET title = ?2, description = ?3, status = ?4, 
@@ -181,10 +207,162 @@ impl TaskService {
         .bind(&task.notification_time)
         .bind(&task.notification_days_of_week)
         .bind(&task.notification_level)
-        .execute(&self.db.pool)
-        .await?;
+        .execute(&mut *tx)
+        .await {
+            Ok(result) => {
+                println!("UpdateTask: Successfully updated main task record for task {}, rows_affected: {}", task.id, result.rows_affected());
+            },
+            Err(e) => {
+                println!("UpdateTask: FAILED to update main task record for task {}: {:?}", task.id, e);
+                return Err(e.into());
+            }
+        }
         
-        Ok(task)
+        // タグの更新処理（メインタスク更新後に実行）
+        if let Some(tags) = request.tags {
+            println!("UpdateTask: Processing {} tags for task {}", tags.len(), task.id);
+            for tag in &tags {
+                println!("UpdateTask: Tag ID: {}, Name: {}", tag.id, tag.name);
+            }
+            
+            // 既存のタグ関連付けを削除
+            println!("UpdateTask: Deleting existing tag relations for task {}", task.id);
+            let delete_result = sqlx::query("DELETE FROM task_tags WHERE task_id = ?1")
+                .bind(&task.id)
+                .execute(&mut *tx)
+                .await?;
+            println!("UpdateTask: Deleted {} existing tag relations", delete_result.rows_affected());
+            
+            // 新しいタグ関連付けを追加（存在するタグのみ）
+            for tag in tags {
+                // タスクが存在するかチェック（念のため）
+                let task_exists: Option<(String,)> = sqlx::query_as(
+                    "SELECT id FROM tasks WHERE id = ?1"
+                )
+                .bind(&task.id)
+                .fetch_optional(&mut *tx)
+                .await?;
+                
+                println!("UpdateTask: Task {} exists: {}", task.id, task_exists.is_some());
+                
+                // タグが存在するかチェック
+                let tag_exists: Option<(String, String, String)> = sqlx::query_as(
+                    "SELECT id, name, color FROM tags WHERE id = ?1"
+                )
+                .bind(&tag.id)
+                .fetch_optional(&mut *tx)
+                .await?;
+                
+                let tag_found = if let Some((found_id, found_name, found_color)) = &tag_exists {
+                    println!("UpdateTask: Tag found - ID: {}, Name: {}, Color: {}", found_id, found_name, found_color);
+                    true
+                } else {
+                    println!("UpdateTask: Tag {} does not exist", tag.id);
+                    false
+                };
+                
+                if task_exists.is_some() && tag_found {
+                    println!("UpdateTask: About to insert task_tag relation: task_id={}, tag_id={}", task.id, tag.id);
+                    
+                    let current_time = Utc::now().to_rfc3339();
+                    match sqlx::query(
+                        r#"
+                        INSERT INTO task_tags (task_id, tag_id, created_at)
+                        VALUES (?1, ?2, ?3)
+                        "#,
+                    )
+                    .bind(&task.id)
+                    .bind(&tag.id)
+                    .bind(&current_time)
+                    .execute(&mut *tx)
+                    .await {
+                        Ok(result) => {
+                            println!("UpdateTask: Successfully added tag {} to task {}, rows_affected: {}", tag.id, task.id, result.rows_affected());
+                        },
+                        Err(e) => {
+                            println!("UpdateTask: FAILED to add tag {} to task {}: {:?}", tag.id, task.id, e);
+                            
+                            // FOREIGN KEY制約の詳細なデバッグ情報を取得
+                            let fk_check: Result<Vec<(String, String, String, String)>, _> = sqlx::query_as(
+                                "PRAGMA foreign_key_check"
+                            )
+                            .fetch_all(&mut *tx)
+                            .await;
+                            
+                            match fk_check {
+                                Ok(violations) => {
+                                    if !violations.is_empty() {
+                                        println!("UpdateTask: FOREIGN KEY violations found:");
+                                        for (table, rowid, parent, fkid) in violations {
+                                            println!("  - Table: {}, RowID: {}, Parent: {}, ForeignKeyID: {}", table, rowid, parent, fkid);
+                                        }
+                                    } else {
+                                        println!("UpdateTask: No FOREIGN KEY violations found in entire database");
+                                    }
+                                },
+                                Err(fk_err) => {
+                                    println!("UpdateTask: Failed to check FOREIGN KEY constraints: {:?}", fk_err);
+                                }
+                            }
+                            
+                            // FOREIGN KEY設定を確認
+                            let fk_status: Result<(i64,), _> = sqlx::query_as(
+                                "PRAGMA foreign_keys"
+                            )
+                            .fetch_one(&mut *tx)
+                            .await;
+                            
+                            match fk_status {
+                                Ok((enabled,)) => {
+                                    println!("UpdateTask: FOREIGN KEY constraints enabled: {}", enabled == 1);
+                                },
+                                Err(status_err) => {
+                                    println!("UpdateTask: Failed to check FOREIGN KEY status: {:?}", status_err);
+                                }
+                            }
+                            
+                            // 手動でINSERTを試行して詳細エラーを取得
+                            println!("UpdateTask: Attempting manual INSERT to identify specific constraint failure");
+                            let manual_insert_result = sqlx::query(
+                                "INSERT INTO task_tags (task_id, tag_id, created_at) VALUES (?1, ?2, ?3)"
+                            )
+                            .bind(&task.id)
+                            .bind(&tag.id)  
+                            .bind(&current_time)
+                            .execute(&mut *tx)
+                            .await;
+                            
+                            match manual_insert_result {
+                                Ok(result) => {
+                                    println!("UpdateTask: Manual INSERT succeeded, rows_affected: {}", result.rows_affected());
+                                    // 成功したので重複を避けるためにロールバック要素を削除
+                                    sqlx::query("DELETE FROM task_tags WHERE task_id = ?1 AND tag_id = ?2")
+                                        .bind(&task.id)
+                                        .bind(&tag.id)
+                                        .execute(&mut *tx)
+                                        .await
+                                        .ok();
+                                },
+                                Err(manual_err) => {
+                                    println!("UpdateTask: Manual INSERT also failed: {:?}", manual_err);
+                                }
+                            }
+                            
+                            return Err(e.into());
+                        }
+                    }
+                } else {
+                    println!("UpdateTask: Tag {} does not exist, skipping", tag.id);
+                }
+            }
+        }
+        
+        // トランザクションをコミット
+        tx.commit().await?;
+        println!("UpdateTask: Transaction committed successfully for task {}", task.id);
+        
+        // 更新後のタスクを最新のタグ情報と一緒に返す
+        self.get_task_by_id(id).await
     }
     
     pub async fn delete_task(&self, id: &str) -> Result<(), AppError> {
@@ -237,6 +415,7 @@ impl TaskService {
             parent_id: None,
             due_date: None,
             notification_settings: None,
+            tags: None,
         }).await
     }
     

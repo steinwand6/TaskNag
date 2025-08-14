@@ -23,6 +23,11 @@ impl Database {
             .connect(&db_url)
             .await?;
         
+        // FOREIGN KEY制約を有効化（デバッグ用に一時的に確認）
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&pool)
+            .await?;
+        
         let db = Self { pool };
         
         // Run migrations manually since we're not using sqlx migrate macro

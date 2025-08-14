@@ -78,6 +78,7 @@ export interface UpdateTaskRequest {
   parentId?: string;
   dueDate?: Date;
   notificationSettings?: TaskNotificationSettings;
+  tags?: Tag[];
 }
 
 // Zustand store interface

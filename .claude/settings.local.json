@@ -56,7 +56,13 @@
       "Bash(scripts/dev.bat status)",
       "Bash(scriptsdev.bat stop)",
       "Bash(scripts/dev.bat:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(echo $APPDATA)",
+      "Bash(scriptsdev.bat restart)",
+      "Bash(sqlite3:*)",
+      "Bash(cp:*)",
+      "Bash(del \"C:\\Users\\stone\\AppData\\Roaming\\com.tasknag.app\\tasknag.db\")",
+      "Bash(npm run test:*)"
     ],
     "deny": [],
     "ask": [],

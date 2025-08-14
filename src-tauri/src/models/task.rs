@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::models::tag::Tag;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
@@ -92,6 +93,9 @@ pub struct Task {
     pub notification_time: Option<String>,       // HH:MM形式
     pub notification_days_of_week: Option<String>, // JSON配列 "[0,1,2]"
     pub notification_level: Option<i32>,         // 1, 2, 3
+    // Tag system
+    #[sqlx(skip)]
+    pub tags: Option<Vec<Tag>>,
 }
 
 impl Task {
@@ -115,6 +119,8 @@ impl Task {
             notification_time: None,
             notification_days_of_week: None,
             notification_level: Some(1),
+            // Tag system
+            tags: None,
         }
     }
 }
@@ -143,4 +149,5 @@ pub struct UpdateTaskRequest {
     pub due_date: Option<DateTime<Utc>>,
     // Notification settings (replaces priority system)
     pub notification_settings: Option<TaskNotificationSettings>,
+    pub tags: Option<Vec<Tag>>,
 }

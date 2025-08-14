@@ -101,6 +101,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   updateTask: async (id, updateData) => {
     set({ isLoading: true, error: null });
     try {
+      // デバッグ: 送信されるタグデータをログ出力
+      const logMessage = `updateTask - updateData.tags: ${JSON.stringify(updateData.tags?.map(tag => ({ id: tag.id, name: tag.name, color: tag.color })))}`;
+      console.log(logMessage);
+      LogService.info(`Frontend updateTask: ${logMessage}`);
+      
       const updateRequest: UpdateTaskRequest = {
         title: updateData.title,
         description: updateData.description,
@@ -108,9 +113,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         parentId: updateData.parentId,
         dueDate: updateData.dueDate,
         notificationSettings: updateData.notificationSettings,
+        tags: updateData.tags,
       };
 
+      LogService.info(`Frontend updateTask: Calling TaskService.updateTask with request: ${JSON.stringify(updateRequest, null, 2)}`);
       const updatedTask = await TaskService.updateTask(id, updateRequest);
+      LogService.info(`Frontend updateTask: Successfully updated task ${id}`);
       const parsedTask = {
         ...updatedTask,
         createdAt: new Date(updatedTask.createdAt),
@@ -127,7 +135,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       // Update system tray title
       TaskService.updateTrayTitle().catch(console.error);
     } catch (error) {
-      console.error('TaskStore.updateTask error:', error);
+      const errorMessage = `TaskStore.updateTask error: ${error}`;
+      console.error(errorMessage);
+      LogService.error(`Frontend updateTask ERROR: ${errorMessage}`);
+      LogService.error(`Frontend updateTask ERROR - Full error object: ${JSON.stringify(error, null, 2)}`);
       set({ error: error as Error, isLoading: false });
     }
   },

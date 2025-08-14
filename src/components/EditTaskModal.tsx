@@ -18,7 +18,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
     LogService.info('EditTaskModal: onCloseが呼ばれました');
     onClose();
   };
-  const { updateTask, tags, loadTags } = useTaskStore();
+  const { updateTask, tags, loadTags, createTag } = useTaskStore();
   
   // タグ管理用状態
   const [selectedTags, setSelectedTags] = React.useState<Tag[]>([]);
@@ -63,13 +63,16 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
     LogService.info('EditTaskModal: handleSubmitが呼ばれました');
     if (!formData.title.trim() || !task) return;
     
+    // 一時的なIDを持つタグを除外（実際のDBに存在するタグのみを保存）
+    const validTags = selectedTags.filter(tag => !tag.id.startsWith('temp-'));
+    
     updateTask(task.id, {
       title: formData.title,
       description: formData.description || undefined,
       status: formData.status,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
       notificationSettings: formData.notificationSettings,
-      tags: selectedTags,
+      tags: validTags,
     });
     
     handleClose();
@@ -94,20 +97,22 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   const handleCreateNewTag = async () => {
     if (!newTagName.trim()) return;
     
-    // 新しいタグを作成（実際の実装では addTagToTask を使用）
-    const tempId = `temp-${Date.now()}`;
-    const newTag: Tag = {
-      id: tempId,
-      name: newTagName.trim(),
-      color: newTagColor,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    setSelectedTags([...selectedTags, newTag]);
-    setNewTagName('');
-    setNewTagColor('#3b82f6');
-    setShowTagSelector(false);
+    try {
+      // 実際にタグを作成してからタスクに追加
+      const newTag = await createTag({
+        name: newTagName.trim(),
+        color: newTagColor
+      });
+      
+      setSelectedTags([...selectedTags, newTag]);
+      setNewTagName('');
+      setNewTagColor('#3b82f6');
+      setShowTagSelector(false);
+    } catch (error) {
+      console.error('Failed to create new tag:', error);
+      // エラー処理：ユーザーに通知
+      alert('タグの作成に失敗しました。もう一度お試しください。');
+    }
   };
   
   const availableTags = tags.filter(tag => 
