@@ -91,6 +91,8 @@ pub fn create_test_task_with_notifications() -> Task {
         notification_time: Some("09:00".to_string()),
         notification_days_of_week: Some("[1,2,3,4,5]".to_string()),
         notification_level: Some(2),
+        // Browser actions
+        browser_actions: None,
         // Tag system
         tags: None,
     }
@@ -115,6 +117,8 @@ pub fn create_test_task_due_date_based() -> Task {
         notification_time: Some("10:30".to_string()),
         notification_days_of_week: None,
         notification_level: Some(3),
+        // Browser actions
+        browser_actions: None,
         // Tag system
         tags: None,
     }

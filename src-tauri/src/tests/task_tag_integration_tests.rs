@@ -35,6 +35,7 @@ async fn test_task_update_with_tags() {
         parent_id: None,
         due_date: None,
         notification_settings: None,
+        browser_actions: None,
     };
     
     let task = task_service.create_task(create_request).await.unwrap();
@@ -63,6 +64,7 @@ async fn test_task_update_with_tags() {
         parent_id: None,
         due_date: None,
         notification_settings: None,
+        browser_actions: None,
         tags: Some(vec![tag1.clone(), tag2.clone()]),
     };
     
@@ -82,6 +84,7 @@ async fn test_task_update_with_tags() {
         parent_id: None,
         due_date: None,
         notification_settings: None,
+        browser_actions: None,
         tags: Some(vec![tag1.clone()]),
     };
     
@@ -100,6 +103,7 @@ async fn test_task_update_with_tags() {
         parent_id: None,
         due_date: None,
         notification_settings: None,
+        browser_actions: None,
         tags: Some(vec![]),
     };
     
@@ -134,6 +138,7 @@ async fn test_create_tag_and_add_to_task() {
         parent_id: None,
         due_date: None,
         notification_settings: None,
+        browser_actions: None,
     };
     
     let task = task_service.create_task(create_request).await.unwrap();
@@ -155,6 +160,7 @@ async fn test_create_tag_and_add_to_task() {
         parent_id: None,
         due_date: None,
         notification_settings: None,
+        browser_actions: None,
         tags: Some(vec![new_tag.clone()]),
     };
     

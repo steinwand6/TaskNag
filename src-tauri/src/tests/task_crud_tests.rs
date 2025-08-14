@@ -20,6 +20,7 @@ async fn test_basic_task_crud_operations() {
         parent_id: None,
         due_date: None,
         notification_settings: None,
+        browser_actions: None,
     };
     
     let task_data = Task {
@@ -39,6 +40,8 @@ async fn test_basic_task_crud_operations() {
         notification_time: None,
         notification_days_of_week: None,
         notification_level: Some(1),
+        // Browser actions
+        browser_actions: None,
         // Tag system
         tags: None,
     };

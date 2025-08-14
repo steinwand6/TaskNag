@@ -65,7 +65,8 @@
       "Bash(npm run test:*)",
       "Bash(npm run:*)",
       "Bash(curl:*)",
-      "Bash(ollama list:*)"
+      "Bash(ollama list:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": [],

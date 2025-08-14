@@ -39,6 +39,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
                     notification_time TEXT DEFAULT NULL,
                     notification_days_of_week TEXT DEFAULT NULL,
                     notification_level INTEGER DEFAULT 1 CHECK(notification_level IN (1, 2, 3)),
+                    browser_actions TEXT DEFAULT NULL,
                     FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
                 )
                 "#,
@@ -52,7 +53,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
                 INSERT OR IGNORE INTO tasks_new (
                     id, title, description, status, parent_id, due_date, completed_at, 
                     created_at, updated_at, progress, notification_type, notification_days_before, 
-                    notification_time, notification_days_of_week, notification_level
+                    notification_time, notification_days_of_week, notification_level, browser_actions
                 )
                 SELECT 
                     id, title, description, status, parent_id, due_date, completed_at, 
@@ -60,7 +61,8 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
                     COALESCE(progress, 0) as progress,
                     COALESCE(notification_type, 'none') as notification_type,
                     notification_days_before, notification_time, notification_days_of_week,
-                    COALESCE(notification_level, 1) as notification_level
+                    COALESCE(notification_level, 1) as notification_level,
+                    NULL as browser_actions
                 FROM tasks
                 "#,
             )
@@ -107,6 +109,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
                 notification_time TEXT DEFAULT NULL,
                 notification_days_of_week TEXT DEFAULT NULL,
                 notification_level INTEGER DEFAULT 1 CHECK(notification_level IN (1, 2, 3)),
+                browser_actions TEXT DEFAULT NULL,
                 FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
             )
             "#,
@@ -200,6 +203,16 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
         ALTER TABLE task_tags ADD COLUMN created_at TEXT DEFAULT (datetime('now'))
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok(); // Ignore error if column already exists
+    
+    // Add browser_actions column to tasks table if it doesn't exist
+    sqlx::query(
+        r#"
+        ALTER TABLE tasks ADD COLUMN browser_actions TEXT DEFAULT NULL
         "#,
     )
     .execute(pool)
