@@ -1,6 +1,7 @@
 use crate::database::Database;
 use crate::error::AppError;
-use crate::models::{CreateTaskRequest, Task, UpdateTaskRequest};
+use crate::models::{CreateTaskRequest, Task, UpdateTaskRequest, Tag, CreateTagRequest, UpdateTagRequest};
+use crate::services::TagService;
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -486,5 +487,40 @@ fn should_notify_at_time(now: &chrono::DateTime<chrono::Utc>, time_str: &str) ->
         (current_seconds as i32 - target_seconds as i32).abs() <= 30
     } else {
         false
+    }
+}
+
+impl TaskService {
+    // タグ関連メソッド
+    pub async fn get_all_tags(&self) -> Result<Vec<Tag>, AppError> {
+        TagService::get_all_tags(&self.db.pool).await
+    }
+    
+    pub async fn get_tag_by_id(&self, id: &str) -> Result<Tag, AppError> {
+        TagService::get_tag_by_id(&self.db.pool, id).await
+    }
+    
+    pub async fn create_tag(&self, request: CreateTagRequest) -> Result<Tag, AppError> {
+        TagService::create_tag(&self.db.pool, request).await
+    }
+    
+    pub async fn update_tag(&self, id: &str, request: UpdateTagRequest) -> Result<Tag, AppError> {
+        TagService::update_tag(&self.db.pool, id, request).await
+    }
+    
+    pub async fn delete_tag(&self, id: &str) -> Result<(), AppError> {
+        TagService::delete_tag(&self.db.pool, id).await
+    }
+    
+    pub async fn add_tag_to_task(&self, task_id: &str, tag_id: &str) -> Result<(), AppError> {
+        TagService::add_tag_to_task(&self.db.pool, task_id, tag_id).await
+    }
+    
+    pub async fn remove_tag_from_task(&self, task_id: &str, tag_id: &str) -> Result<(), AppError> {
+        TagService::remove_tag_from_task(&self.db.pool, task_id, tag_id).await
+    }
+    
+    pub async fn get_tags_for_task(&self, task_id: &str) -> Result<Vec<Tag>, AppError> {
+        TagService::get_tags_for_task(&self.db.pool, task_id).await
     }
 }

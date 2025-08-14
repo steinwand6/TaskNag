@@ -29,8 +29,9 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
         CREATE TABLE IF NOT EXISTS tags (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
-            color TEXT,
-            created_at TEXT NOT NULL
+            color TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         )
         "#,
     )
@@ -43,6 +44,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
         CREATE TABLE IF NOT EXISTS task_tags (
             task_id TEXT NOT NULL,
             tag_id TEXT NOT NULL,
+            created_at TEXT NOT NULL,
             PRIMARY KEY (task_id, tag_id),
             FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
             FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
@@ -258,6 +260,35 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
             .await
             .ok();
     }
+    
+    // Add missing columns to tags table if they don't exist
+    sqlx::query(
+        r#"
+        ALTER TABLE tags ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok(); // Ignore error if column already exists
+    
+    sqlx::query(
+        r#"
+        UPDATE tags SET color = '#3182CE' WHERE color IS NULL
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok();
+    
+    // Add missing created_at column to task_tags if it doesn't exist
+    sqlx::query(
+        r#"
+        ALTER TABLE task_tags ADD COLUMN created_at TEXT DEFAULT (datetime('now'))
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok(); // Ignore error if column already exists
     
     Ok(())
 }
