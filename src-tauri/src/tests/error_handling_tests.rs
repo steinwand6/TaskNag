@@ -85,7 +85,7 @@ async fn test_data_validation_errors() {
     for priority in invalid_priorities.iter() {
         let mut task = create_test_task_with_notifications();
         task.id = Uuid::new_v4().to_string();
-        task.priority = priority.to_string();
+        // priority field removed
         
         println!("⚠️  Invalid priority '{}' - MockDB allows, real service should reject", priority);
     }
@@ -281,7 +281,7 @@ async fn test_concurrency_errors() {
     // Simulate two concurrent updates
     let mut task_update_1 = created_task.clone();
     task_update_1.title = "Updated by User 1".to_string();
-    task_update_1.priority = "high".to_string();
+    // priority field removed
     
     let mut task_update_2 = created_task.clone();
     task_update_2.title = "Updated by User 2".to_string();

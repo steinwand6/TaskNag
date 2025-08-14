@@ -46,7 +46,7 @@ async fn test_basic_task_crud_operations() {
     assert_eq!(created_task.title, "Test Task");
     assert_eq!(created_task.description, Some("Test description".to_string()));
     assert_eq!(created_task.status, "todo");
-    assert_eq!(created_task.priority, "medium");
+    // priority field removed
     assert_eq!(created_task.progress, Some(0));
     
     println!("✅ Task creation test passed");
@@ -65,7 +65,7 @@ async fn test_basic_task_crud_operations() {
     updated_task.title = "Updated Test Task".to_string();
     updated_task.description = Some("Updated description".to_string());
     updated_task.status = "in_progress".to_string();
-    updated_task.priority = "high".to_string();
+    // priority field removed
     updated_task.progress = Some(50);
     
     let update_result = mock_db.update_task(&updated_task.id, updated_task.clone()).unwrap();
@@ -73,7 +73,7 @@ async fn test_basic_task_crud_operations() {
     assert_eq!(update_result.title, "Updated Test Task");
     assert_eq!(update_result.description, Some("Updated description".to_string()));
     assert_eq!(update_result.status, "in_progress");
-    assert_eq!(update_result.priority, "high");
+    // priority field removed
     assert_eq!(update_result.progress, Some(50));
     
     println!("✅ Task update test passed");
@@ -132,46 +132,6 @@ async fn test_task_status_transitions() {
     println!("🎉 All status transition tests passed!");
 }
 
-/// 優先度管理のテスト
-#[tokio::test]
-async fn test_task_priority_management() {
-    let mock_db = MockDatabase::new();
-    
-    println!("🧪 Testing task priority management...");
-    
-    let priorities = ["low", "medium", "high"];
-    let mut created_tasks = Vec::new();
-    
-    // 各優先度でタスクを作成
-    for priority in priorities.iter() {
-        let mut task = create_test_task_with_notifications();
-        task.id = Uuid::new_v4().to_string();
-        task.title = format!("Task with {} priority", priority);
-        task.priority = priority.to_string();
-        
-        let created_task = mock_db.insert_task(task).unwrap();
-        assert_eq!(created_task.priority, *priority);
-        
-        created_tasks.push(created_task);
-        println!("✅ Created task with '{}' priority", priority);
-    }
-    
-    // 優先度変更テスト
-    let mut task_to_update = created_tasks[0].clone(); // low priority task
-    task_to_update.priority = "high".to_string();
-    
-    let updated_task = mock_db.update_task(&task_to_update.id.clone(), task_to_update).unwrap();
-    assert_eq!(updated_task.priority, "high");
-    
-    println!("✅ Priority update test passed");
-    
-    // Cleanup
-    for task in created_tasks {
-        mock_db.delete_task(&task.id).unwrap();
-    }
-    
-    println!("🎉 All priority management tests passed!");
-}
 
 /// 期日管理のテスト
 #[tokio::test]
@@ -373,11 +333,7 @@ async fn test_bulk_task_operations() {
         let mut task = create_test_task_with_notifications();
         task.id = Uuid::new_v4().to_string();
         task.title = format!("Bulk Task {}", i + 1);
-        task.priority = match i % 3 {
-            0 => "low".to_string(),
-            1 => "medium".to_string(),
-            _ => "high".to_string(),
-        };
+        // priority field removed - using notification_level instead
         
         let created_task = mock_db.insert_task(task).unwrap();
         created_task_ids.push(created_task.id);
@@ -392,12 +348,9 @@ async fn test_bulk_task_operations() {
     println!("✅ Retrieved all {} tasks successfully", all_tasks.len());
     
     // Test 3: 条件別カウント
-    let low_priority_count = all_tasks.iter().filter(|t| t.priority == "low").count();
-    let medium_priority_count = all_tasks.iter().filter(|t| t.priority == "medium").count();
-    let high_priority_count = all_tasks.iter().filter(|t| t.priority == "high").count();
+    // priority field removed - counts are now based on other criteria
     
-    println!("✅ Priority distribution: Low={}, Medium={}, High={}", 
-             low_priority_count, medium_priority_count, high_priority_count);
+    println!("✅ Tasks created successfully");
     
     // Test 4: 一括ステータス更新
     let mut updated_count = 0;
@@ -437,10 +390,6 @@ fn task_crud_tests() {
     // Test 2: Status transitions
     test_task_status_transitions();
     println!("✅ Status transitions test PASSED");
-    
-    // Test 3: Priority management
-    test_task_priority_management();
-    println!("✅ Priority management test PASSED");
     
     // Test 4: Due date management
     test_task_due_date_management();

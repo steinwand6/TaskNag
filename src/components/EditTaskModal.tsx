@@ -1,8 +1,8 @@
 import React from 'react';
-import { Task, TaskStatus, Priority, TaskNotificationSettings } from '../types/Task';
+import { Task, TaskStatus, TaskNotificationSettings } from '../types/Task';
 import { NotificationSettings } from './NotificationSettings';
 import { useTaskStore } from '../stores/taskStore';
-import { DEFAULT_TASK_STATUS, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../constants';
+import { DEFAULT_TASK_STATUS, STATUS_OPTIONS } from '../constants/taskStatus';
 import { LogService } from '../services/logService';
 
 interface EditTaskModalProps {
@@ -21,7 +21,6 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
-    priority: 'medium' as Priority,
     status: DEFAULT_TASK_STATUS,
     dueDate: '',
     notificationSettings: {
@@ -36,7 +35,6 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
       setFormData({
         title: task.title,
         description: task.description || '',
-        priority: task.priority,
         status: task.status,
         dueDate: task.dueDate ? task.dueDate.toISOString().split('T')[0] : '',
         notificationSettings: task.notificationSettings || {
@@ -55,7 +53,6 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
     updateTask(task.id, {
       title: formData.title,
       description: formData.description || undefined,
-      priority: formData.priority,
       status: formData.status,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
       notificationSettings: formData.notificationSettings,
@@ -114,23 +111,6 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                優先度
-              </label>
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {PRIORITY_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 ステータス

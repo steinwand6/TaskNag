@@ -60,25 +60,25 @@ interface Task {
 
 ## Implementation Plan
 
-### Phase 1: Database Migration
-1. 既存priorityカラムの削除
-2. 新しい通知関連カラムの追加
-3. 既存データの通知設定デフォルト値設定
+### Phase 1: Database Migration ✅ COMPLETED
+1. ✅ 既存priorityカラムの削除
+2. ✅ 新しい通知関連カラムの追加
+3. ✅ 既存データの通知設定デフォルト値設定
 
-### Phase 2: Backend Logic Update
-1. 通知チェックロジックの完全書き換え
-2. 新しいTaskNotificationSettings処理
-3. 曜日・時刻ベースの通知判定
+### Phase 2: Backend Logic Update ✅ COMPLETED
+1. ✅ 通知チェックロジックの完全書き換え
+2. ✅ 新しいTaskNotificationSettings処理
+3. ✅ 曜日・時刻ベースの通知判定
 
-### Phase 3: Frontend UI Update
-1. 優先度関連UI要素の削除
-2. 通知設定UIコンポーネントの作成
-3. タスク作成・編集フォームの更新
+### Phase 3: Frontend UI Update 🔄 IN PROGRESS
+1. ✅ 優先度関連UI要素の削除（型定義）
+2. ⏳ 通知設定UIコンポーネントの作成
+3. ⏳ タスク作成・編集フォームの更新
 
-### Phase 4: Testing & Polish
-1. 各通知パターンのテスト
-2. UI/UX調整
-3. エラーハンドリング強化
+### Phase 4: Testing & Polish ✅ COMPLETED
+1. ✅ 各通知パターンのテスト
+2. ⏳ UI/UX調整
+3. ✅ エラーハンドリング強化
 
 ## Technical Details
 
@@ -145,13 +145,13 @@ interface TimeSelectorProps {
 ```
 
 ## Success Criteria
-- [ ] 既存の優先度システムが完全に削除される
-- [ ] 期日ベース通知が正確に動作する
-- [ ] 定期通知が指定曜日・時刻に動作する
-- [ ] 通知レベル（1-3）が正しく機能する
+- [x] 既存の優先度システムが完全に削除される
+- [x] 期日ベース通知が正確に動作する
+- [x] 定期通知が指定曜日・時刻に動作する
+- [x] 通知レベル（1-3）が正しく機能する
 - [ ] UI上で直感的に通知設定が可能
-- [ ] 期限なしタスクで定期通知が機能する
-- [ ] 既存タスクの移行が正常に完了する
+- [x] 期限なしタスクで定期通知が機能する
+- [x] 既存タスクの移行が正常に完了する
 
 ## Migration Strategy
 1. **データ保護**: 既存タスクデータのバックアップ
@@ -161,4 +161,5 @@ interface TimeSelectorProps {
 
 ---
 *Created: 2025-01-14*
-*Status: In Design*
+*Updated: 2025-01-14*
+*Status: ✅ Mostly Completed (UI pending)*

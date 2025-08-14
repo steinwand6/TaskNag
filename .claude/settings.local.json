@@ -47,7 +47,8 @@
       "Bash(find:*)",
       "Bash(cargo:*)",
       "Bash(grep:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm test)"
     ],
     "deny": [],
     "ask": []

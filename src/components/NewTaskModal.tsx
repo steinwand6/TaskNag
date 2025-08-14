@@ -1,7 +1,7 @@
 import React from 'react';
-import { TaskStatus, Priority } from '../types/Task';
+import { TaskStatus } from '../types/Task';
 import { useTaskStore } from '../stores/taskStore';
-import { DEFAULT_TASK_STATUS, DEFAULT_PRIORITY, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../constants';
+import { DEFAULT_TASK_STATUS, STATUS_OPTIONS } from '../constants/taskStatus';
 
 interface NewTaskModalProps {
   isOpen: boolean;
@@ -14,7 +14,6 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
-    priority: DEFAULT_PRIORITY,
     status: initialStatus,
     dueDate: '',
   });
@@ -27,7 +26,6 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
       await addTask({
         title: formData.title,
         description: formData.description || undefined,
-        priority: formData.priority,
         status: formData.status,
         dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
       });
@@ -35,7 +33,6 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
       setFormData({
         title: '',
         description: '',
-        priority: DEFAULT_PRIORITY,
         status: initialStatus,
         dueDate: '',
       });
@@ -89,23 +86,6 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                優先度
-              </label>
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {PRIORITY_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 ステータス

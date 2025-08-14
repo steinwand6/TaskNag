@@ -36,34 +36,34 @@
     - ESLint + Prettier の設定
 
 ### 📊 Database Layer
-- [ ] **TASK-004**: SQLite データベース設計と実装
+- [x] **TASK-004**: SQLite データベース設計と実装 ✅ COMPLETED
   - Priority: Critical
   - Estimate: 6 hours
   - Dependencies: TASK-002
   - Details:
-    - データベース接続管理 (`database/connection.rs`)
-    - マイグレーション機能の実装
-    - 基本テーブル作成（tasks, tags, task_tags）
-    - インデックス設定
+    - ✅ データベース接続管理 (`database/connection.rs`)
+    - ✅ マイグレーション機能の実装
+    - ✅ 基本テーブル作成（tasks, tags, task_tags）
+    - ✅ インデックス設定
 
-- [ ] **TASK-005**: データモデルの定義
+- [x] **TASK-005**: データモデルの定義 ✅ COMPLETED
   - Priority: High
   - Estimate: 4 hours
   - Dependencies: TASK-004
   - Details:
-    - Task, Priority, TaskStatus の構造体定義
-    - SQLite との型マッピング
-    - Serialize/Deserialize の実装
+    - ✅ Task, TaskStatus の構造体定義（Priority削除）
+    - ✅ SQLite との型マッピング
+    - ✅ Serialize/Deserialize の実装
 
-- [ ] **TASK-006**: 基本 CRUD 操作の実装
+- [x] **TASK-006**: 基本 CRUD 操作の実装 ✅ COMPLETED
   - Priority: Critical
   - Estimate: 8 hours
   - Dependencies: TASK-005
   - Details:
-    - TaskService の実装
-    - create_task, update_task, delete_task
-    - get_tasks, get_task_by_id
-    - エラーハンドリング
+    - ✅ TaskService の実装
+    - ✅ create_task, update_task, delete_task
+    - ✅ get_tasks, get_task_by_id
+    - ✅ エラーハンドリング
 
 ### 🔧 Backend Core
 - [ ] **TASK-007**: Tauri Commands の実装
@@ -155,23 +155,23 @@
 ## Phase 2: Notification System
 
 ### 🔔 Core Notification
-- [ ] **TASK-201**: 通知システム基盤の実装
+- [x] **TASK-201**: 通知システム基盤の実装 ✅ COMPLETED
   - Priority: High
   - Estimate: 6 hours
   - Dependencies: TASK-015
   - Details:
-    - NotificationService の実装
-    - Windows Toast Notification 統合
-    - 通知スケジューリング機能
+    - ✅ NotificationService の実装
+    - ✅ Windows Toast Notification 統合
+    - ✅ 通知スケジューリング機能
 
-- [ ] **TASK-202**: 3段階通知レベルの実装
+- [x] **TASK-202**: 3段階通知レベルの実装 ✅ COMPLETED
   - Priority: High
   - Estimate: 5 hours
   - Dependencies: TASK-201
   - Details:
-    - Level 1: システム通知のみ
-    - Level 2: システム通知 + 音声
-    - Level 3: アプリ最大化 + 通知
+    - ✅ Level 1: システム通知のみ
+    - ✅ Level 2: システム通知 + 音声
+    - ✅ Level 3: アプリ最大化 + 通知
 
 - [ ] **TASK-203**: 音声通知システムの実装
   - Priority: Medium

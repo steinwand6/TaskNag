@@ -67,15 +67,6 @@ export const TaskDetailPage: React.FC = () => {
     }
   };
 
-  const getPriorityDisplay = (priority: Task['priority']) => {
-    const priorityMap = {
-      required: '🚨 必須',
-      high: '🔴 高',
-      medium: '🟡 中',
-      low: '🟢 低'
-    };
-    return priorityMap[priority] || priority;
-  };
 
   const getStatusDisplay = (status: Task['status']) => {
     const statusMap = {
@@ -159,17 +150,11 @@ export const TaskDetailPage: React.FC = () => {
             </div>
 
             {/* メタ情報 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="text-sm text-gray-500 mb-1">ステータス</div>
                 <div className="font-semibold text-gray-900">
                   {getStatusDisplay(task.status)}
-                </div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-sm text-gray-500 mb-1">優先度</div>
-                <div className="font-semibold text-gray-900">
-                  {getPriorityDisplay(task.priority)}
                 </div>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">

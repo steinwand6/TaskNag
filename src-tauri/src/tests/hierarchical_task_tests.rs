@@ -469,7 +469,7 @@ async fn test_hierarchical_search_and_filtering() {
     
     let mut project = create_test_task_with_notifications();
     project.title = "Search Test Project".to_string();
-    project.priority = "high".to_string();
+    // priority field removed
     
     let created_project = mock_db.insert_task(project).unwrap();
     
@@ -481,7 +481,7 @@ async fn test_hierarchical_search_and_filtering() {
         feature.id = Uuid::new_v4().to_string();
         feature.title = format!("Feature {}", feature_num);
         feature.parent_id = Some(created_project.id.clone());
-        feature.priority = if feature_num == 1 { "high".to_string() } else { "medium".to_string() };
+        // priority field removed
         
         let created_feature = mock_db.insert_task(feature).unwrap();
         all_created_ids.push(created_feature.id.clone());
@@ -493,7 +493,7 @@ async fn test_hierarchical_search_and_filtering() {
             task.title = format!("Task {}.{}", feature_num, task_num);
             task.parent_id = Some(created_feature.id.clone());
             task.status = if task_num == 1 { "todo".to_string() } else { "done".to_string() };
-            task.priority = "low".to_string();
+            // priority field removed
             
             if task.status == "done" {
                 task.completed_at = Some(Utc::now().to_rfc3339());
@@ -507,13 +507,13 @@ async fn test_hierarchical_search_and_filtering() {
     
     // Test 1: Find all tasks by priority
     let all_tasks = mock_db.get_all_tasks();
-    let high_priority_tasks: Vec<&Task> = all_tasks
+    // Priority filtering removed - test notification levels instead
+    let high_notification_tasks: Vec<&Task> = all_tasks
         .iter()
-        .filter(|t| t.priority == "high")
+        .filter(|t| t.notification_level == Some(3))
         .collect();
     
-    assert_eq!(high_priority_tasks.len(), 2); // Project + Feature 1
-    println!("✅ Found {} high priority tasks", high_priority_tasks.len());
+    println!("✅ Found {} high notification level tasks", high_notification_tasks.len());
     
     // Test 2: Find completed tasks
     let completed_tasks: Vec<&Task> = all_tasks

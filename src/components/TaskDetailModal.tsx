@@ -30,15 +30,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }).format(date);
   };
 
-  const getPriorityDisplay = (priority: Task['priority']) => {
-    const priorityMap = {
-      required: '🚨 必須',
-      high: '🔴 高',
-      medium: '🟡 中',
-      low: '🟢 低'
-    };
-    return priorityMap[priority] || priority;
-  };
 
   const getStatusDisplay = (status: Task['status']) => {
     const statusMap = {
@@ -84,10 +75,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <div>
                 <span className="text-gray-500">ステータス:</span>
                 <div className="font-medium">{getStatusDisplay(task.status)}</div>
-              </div>
-              <div>
-                <span className="text-gray-500">優先度:</span>
-                <div className="font-medium">{getPriorityDisplay(task.priority)}</div>
               </div>
               <div>
                 <span className="text-gray-500">期限:</span>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Task, Priority } from '../types/Task';
+import { Task } from '../types/Task';
 import { TaskService } from '../services/taskService';
 import { ProgressBar } from './ProgressBar';
 
@@ -18,7 +18,6 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
     title: '',
     description: '',
     dueDate: '',
-    priority: 'medium' as Priority,
     notificationType: 'none' as 'none' | 'due_date_based' | 'recurring',
     daysBefore: 1,
     notificationTime: '09:00',
@@ -86,7 +85,6 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
       title: subtask.title,
       description: subtask.description || '',
       dueDate: subtask.dueDate ? new Date(subtask.dueDate).toISOString().split('T')[0] : '',
-      priority: subtask.priority,
       notificationType: subtask.notificationSettings?.notificationType || 'none',
       daysBefore: subtask.notificationSettings?.daysBefore || 1,
       notificationTime: subtask.notificationSettings?.notificationTime || '09:00',
@@ -119,7 +117,6 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
           ...editingSubtask,
           title: newSubtask.title.trim(),
           description: newSubtask.description.trim(),
-          priority: newSubtask.priority,
           dueDate: newSubtask.dueDate ? new Date(newSubtask.dueDate) : undefined,
           notificationSettings,
         });
@@ -134,7 +131,6 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
           title: newSubtask.title.trim(),
           description: newSubtask.description.trim(),
           status: 'todo',
-          priority: newSubtask.priority,
           parentId: parentTask.id,
           dueDate: newSubtask.dueDate ? new Date(newSubtask.dueDate) : undefined,
           notificationSettings,
@@ -165,7 +161,6 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
         title: '',
         description: '',
         dueDate: '',
-        priority: 'medium',
         notificationType: 'none',
         daysBefore: 1,
         notificationTime: '09:00',
@@ -381,20 +376,6 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  優先度
-                </label>
-                <select
-                  value={newSubtask.priority}
-                  onChange={(e) => setNewSubtask({ ...newSubtask, priority: e.target.value as Priority })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="low">低</option>
-                  <option value="medium">中</option>
-                  <option value="high">高</option>
-                </select>
-              </div>
 
               {/* 通知設定 */}
               {newSubtask.dueDate && (
@@ -477,8 +458,7 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
                     title: '',
                     description: '',
                     dueDate: '',
-                    priority: 'medium',
-                    notificationType: 'none',
+                                notificationType: 'none',
                     daysBefore: 1,
                     notificationTime: '09:00',
                   });
