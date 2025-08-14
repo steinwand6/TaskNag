@@ -14,7 +14,7 @@ interface EditTaskModalProps {
 export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task }) => {
   // デバッグ用: onCloseが呼ばれた時のログ
   const handleClose = () => {
-    LogService.info('モーダル', 'EditTaskModal: onCloseが呼ばれました');
+    LogService.info('EditTaskModal: onCloseが呼ばれました');
     onClose();
   };
   const { updateTask } = useTaskStore();
@@ -49,7 +49,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    LogService.info('モーダル', 'EditTaskModal: handleSubmitが呼ばれました');
+    LogService.info('EditTaskModal: handleSubmitが呼ばれました');
     if (!formData.title.trim() || !task) return;
     
     updateTask(task.id, {
@@ -65,7 +65,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   };
 
   const handleNotificationChange = (settings: TaskNotificationSettings) => {
-    LogService.info('モーダル', 'EditTaskModal: 通知設定が変更されました', JSON.stringify(settings));
+    LogService.info('EditTaskModal: 通知設定が変更されました', JSON.stringify(settings));
     setFormData({ ...formData, notificationSettings: settings });
   };
   

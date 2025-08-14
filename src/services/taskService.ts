@@ -8,8 +8,8 @@ export class TaskService {
   }
 
   static async getTasks(): Promise<Task[]> {
-    const tasks = await invoke('get_tasks');
-    return tasks.map(task => this.mapTaskWithNotificationSettings(task));
+    const tasks = await invoke<any[]>('get_tasks');
+    return tasks.map((task: any) => this.mapTaskWithNotificationSettings(task));
   }
 
   static async getTaskById(id: string): Promise<Task> {
@@ -27,8 +27,8 @@ export class TaskService {
   }
 
   static async getTasksByStatus(status: TaskStatus): Promise<Task[]> {
-    const tasks = await invoke('get_tasks_by_status', { status });
-    return tasks.map(task => this.mapTaskWithNotificationSettings(task));
+    const tasks = await invoke<any[]>('get_tasks_by_status', { status });
+    return tasks.map((task: any) => this.mapTaskWithNotificationSettings(task));
   }
 
   static async moveTask(id: string, newStatus: TaskStatus): Promise<Task> {
@@ -61,8 +61,8 @@ export class TaskService {
 
   // 子タスク管理機能
   static async getChildren(parentId: string): Promise<Task[]> {
-    const tasks = await invoke('get_children', { parentId });
-    return tasks.map(task => this.mapTaskWithNotificationSettings(task));
+    const tasks = await invoke<any[]>('get_children', { parentId });
+    return tasks.map((task: any) => this.mapTaskWithNotificationSettings(task));
   }
 
   static async getTaskWithChildren(id: string): Promise<Task> {
@@ -80,8 +80,8 @@ export class TaskService {
   }
 
   static async getRootTasks(): Promise<Task[]> {
-    const tasks = await invoke('get_root_tasks');
-    return tasks.map(task => this.mapTaskWithNotificationSettings(task));
+    const tasks = await invoke<any[]>('get_root_tasks');
+    return tasks.map((task: any) => this.mapTaskWithNotificationSettings(task));
   }
 
   private static mapTaskWithNotificationSettings(task: any): Task {

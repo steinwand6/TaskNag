@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Task } from '../types/Task';
+import { Task, Priority } from '../types/Task';
 import { TaskService } from '../services/taskService';
 import { ProgressBar } from './ProgressBar';
-import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 interface SubTaskListProps {
   parentTask: Task;
@@ -13,6 +12,17 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
   const [children, setChildren] = useState<Task[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingSubtask, setEditingSubtask] = useState<Task | null>(null);
+  const [newSubtask, setNewSubtask] = useState({
+    title: '',
+    description: '',
+    dueDate: '',
+    priority: 'medium' as Priority,
+    notificationType: 'none' as 'none' | 'due_date_based' | 'recurring',
+    daysBefore: 1,
+    notificationTime: '09:00',
+  });
 
   // ローカルでの進捗率計算
   const calculateProgress = (childTasks: Task[]) => {
@@ -70,40 +80,99 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
     }
   };
 
-  const handleAddSubtask = async () => {
-    const title = prompt('子タスクのタイトルを入力してください:');
-    if (!title || !title.trim()) return;
+  const handleEditSubtask = (subtask: Task) => {
+    setEditingSubtask(subtask);
+    setNewSubtask({
+      title: subtask.title,
+      description: subtask.description || '',
+      dueDate: subtask.dueDate ? new Date(subtask.dueDate).toISOString().split('T')[0] : '',
+      priority: subtask.priority,
+      notificationType: subtask.notificationSettings?.notificationType || 'none',
+      daysBefore: subtask.notificationSettings?.daysBefore || 1,
+      notificationTime: subtask.notificationSettings?.notificationTime || '09:00',
+    });
+    setShowAddDialog(true);
+  };
+
+  const handleSaveSubtask = async () => {
+    if (!newSubtask.title.trim()) {
+      alert('タイトルを入力してください');
+      return;
+    }
 
     try {
-      const newSubtask = await TaskService.createTask({
-        title: title.trim(),
-        description: '',
-        status: 'todo',
-        priority: 'medium',
-        parentId: parentTask.id,
-        dueDate: undefined,
-      });
+      // 通知設定の準備
+      let notificationSettings = undefined;
+      if (newSubtask.notificationType !== 'none' && newSubtask.dueDate) {
+        notificationSettings = {
+          notificationType: newSubtask.notificationType as 'due_date_based' | 'recurring',
+          daysBefore: newSubtask.daysBefore,
+          notificationTime: newSubtask.notificationTime,
+          daysOfWeek: [],
+          level: 3 as 1 | 2 | 3,
+        };
+      }
 
-      // 子タスクリストを更新
-      const updatedChildren = [...children, newSubtask];
-      setChildren(updatedChildren);
-      
-      // 親タスクの進捗率を即座に更新
-      if (onTaskUpdate) {
-        const newProgress = calculateProgress(updatedChildren);
-        onTaskUpdate({
-          ...parentTask,
-          progress: newProgress
+      if (editingSubtask) {
+        // 既存の子タスクを更新
+        const updatedTask = await TaskService.updateTask(editingSubtask.id, {
+          ...editingSubtask,
+          title: newSubtask.title.trim(),
+          description: newSubtask.description.trim(),
+          priority: newSubtask.priority,
+          dueDate: newSubtask.dueDate ? new Date(newSubtask.dueDate) : undefined,
+          notificationSettings,
         });
-        
-        // バックエンドでも更新（非同期）
-        if (parentTask.id) {
-          TaskService.calculateAndUpdateProgress(parentTask.id).catch(console.error);
+
+        const updatedChildren = children.map(child =>
+          child.id === editingSubtask.id ? updatedTask : child
+        );
+        setChildren(updatedChildren);
+      } else {
+        // 新規子タスクを作成
+        const createdSubtask = await TaskService.createTask({
+          title: newSubtask.title.trim(),
+          description: newSubtask.description.trim(),
+          status: 'todo',
+          priority: newSubtask.priority,
+          parentId: parentTask.id,
+          dueDate: newSubtask.dueDate ? new Date(newSubtask.dueDate) : undefined,
+          notificationSettings,
+        });
+
+        const updatedChildren = [...children, createdSubtask];
+        setChildren(updatedChildren);
+
+        // 親タスクの進捗率を即座に更新
+        if (onTaskUpdate) {
+          const newProgress = calculateProgress(updatedChildren);
+          onTaskUpdate({
+            ...parentTask,
+            progress: newProgress
+          });
+
+          // バックエンドでも更新（非同期）
+          if (parentTask.id) {
+            TaskService.calculateAndUpdateProgress(parentTask.id).catch(console.error);
+          }
         }
       }
+
+      // ダイアログをリセット
+      setShowAddDialog(false);
+      setEditingSubtask(null);
+      setNewSubtask({
+        title: '',
+        description: '',
+        dueDate: '',
+        priority: 'medium',
+        notificationType: 'none',
+        daysBefore: 1,
+        notificationTime: '09:00',
+      });
     } catch (error) {
-      console.error('Failed to create subtask:', error);
-      alert('子タスクの作成に失敗しました');
+      console.error('Failed to save subtask:', error);
+      alert('子タスクの保存に失敗しました');
     }
   };
 
@@ -140,6 +209,42 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
     }
   };
 
+  const formatDueDate = (date: Date | undefined) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const taskDate = new Date(d);
+    taskDate.setHours(0, 0, 0, 0);
+    
+    if (taskDate.getTime() === today.getTime()) {
+      return '今日';
+    } else if (taskDate.getTime() === tomorrow.getTime()) {
+      return '明日';
+    } else if (taskDate < today) {
+      return `期限切れ`;
+    } else {
+      return d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+    }
+  };
+
+  const getDueDateColor = (date: Date | undefined) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (d < today) {
+      return 'text-red-600 font-semibold';
+    } else if (d.getTime() === today.getTime()) {
+      return 'text-orange-600 font-semibold';
+    } else {
+      return 'text-gray-600';
+    }
+  };
+
   const hasChildren = children.length > 0;
   const progress = parentTask.progress || 0;
 
@@ -150,83 +255,240 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
         <ProgressBar progress={progress} className="mb-2" />
       )}
 
-      {/* 子タスク展開ボタン */}
+      {/* 子タスクセクション */}
       <div className="flex items-center gap-2">
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            setIsExpanded(!isExpanded);
-          }}
+          onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"
-          disabled={isLoading}
         >
-          {isExpanded ? (
-            <ChevronDownIcon className="w-4 h-4" />
-          ) : (
-            <ChevronRightIcon className="w-4 h-4" />
-          )}
-          子タスク {hasChildren && `(${children.length})`}
+          <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+            ▶
+          </span>
+          子タスク ({children.length})
         </button>
         
-        {isExpanded && (
-          <button
-            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              handleAddSubtask();
-            }}
-          >
-            <PlusIcon className="w-4 h-4" />
-            追加
-          </button>
-        )}
+        <button
+          onClick={() => setShowAddDialog(true)}
+          className="text-sm text-blue-600 hover:text-blue-800"
+        >
+          + 追加
+        </button>
       </div>
 
       {/* 子タスクリスト */}
       {isExpanded && (
-        <div className="ml-6 space-y-2 border-l-2 border-gray-200 pl-4">
+        <div className="ml-4 space-y-2">
           {isLoading ? (
             <div className="text-sm text-gray-500">読み込み中...</div>
           ) : children.length === 0 ? (
-            <div className="text-sm text-gray-500">子タスクはありません</div>
+            <div className="text-sm text-gray-500">子タスクがありません</div>
           ) : (
             children.map(child => (
-              <div key={child.id} className="bg-gray-50 rounded p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3 flex-1">
-                  <input
-                    type="checkbox"
-                    checked={child.status === 'done'}
-                    onChange={(e) => handleStatusChange(child.id, e.target.checked)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <div className="flex-1">
-                    <h4 className={`font-medium text-sm ${
-                      child.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900'
-                    }`}>
+              <div 
+                key={child.id} 
+                className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50 group"
+              >
+                <input
+                  type="checkbox"
+                  checked={child.status === 'done'}
+                  onChange={(e) => handleStatusChange(child.id, e.target.checked)}
+                  className="mt-1"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm ${child.status === 'done' ? 'line-through text-gray-500' : ''}`}>
                       {child.title}
-                    </h4>
-                    {child.description && (
-                      <p className="text-xs text-gray-600 mt-1">{child.description}</p>
+                    </span>
+                    {child.dueDate && (
+                      <span className={`text-xs ${getDueDateColor(child.dueDate)}`}>
+                        {formatDueDate(child.dueDate)}
+                      </span>
+                    )}
+                    {child.notificationSettings && child.notificationSettings.notificationType !== 'none' && (
+                      <span className="text-xs text-blue-500" title="通知設定あり">
+                        🔔
+                      </span>
                     )}
                   </div>
+                  {child.description && (
+                    <p className="text-xs text-gray-600 mt-1">{child.description}</p>
+                  )}
                 </div>
-                
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(child.id);
-                  }}
-                  className="text-red-500 hover:text-red-700 text-sm ml-2"
-                  title="削除"
-                >
-                  ×
-                </button>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => handleEditSubtask(child)}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    編集
+                  </button>
+                  <button
+                    onClick={() => handleDelete(child.id)}
+                    className="text-xs text-red-600 hover:text-red-800"
+                  >
+                    削除
+                  </button>
+                </div>
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* 子タスク追加/編集ダイアログ */}
+      {showAddDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">
+              {editingSubtask ? '子タスクを編集' : '子タスクを追加'}
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  タイトル <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newSubtask.title}
+                  onChange={(e) => setNewSubtask({ ...newSubtask, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="タスクのタイトル"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  説明
+                </label>
+                <textarea
+                  value={newSubtask.description}
+                  onChange={(e) => setNewSubtask({ ...newSubtask, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="タスクの詳細説明"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  期日
+                </label>
+                <input
+                  type="date"
+                  value={newSubtask.dueDate}
+                  onChange={(e) => setNewSubtask({ ...newSubtask, dueDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  優先度
+                </label>
+                <select
+                  value={newSubtask.priority}
+                  onChange={(e) => setNewSubtask({ ...newSubtask, priority: e.target.value as Priority })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="low">低</option>
+                  <option value="medium">中</option>
+                  <option value="high">高</option>
+                </select>
+              </div>
+
+              {/* 通知設定 */}
+              {newSubtask.dueDate && (
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    通知設定
+                  </label>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">
+                        通知タイプ
+                      </label>
+                      <select
+                        value={newSubtask.notificationType}
+                        onChange={(e) => setNewSubtask({ 
+                          ...newSubtask, 
+                          notificationType: e.target.value as 'none' | 'due_date_based' | 'recurring' 
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="none">通知なし</option>
+                        <option value="due_date_based">期日通知</option>
+                        <option value="recurring">定期通知</option>
+                      </select>
+                    </div>
+
+                    {newSubtask.notificationType !== 'none' && (
+                      <>
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">
+                            何日前に通知
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="30"
+                            value={newSubtask.daysBefore}
+                            onChange={(e) => setNewSubtask({ 
+                              ...newSubtask, 
+                              daysBefore: parseInt(e.target.value) || 1 
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">
+                            通知時刻
+                          </label>
+                          <input
+                            type="time"
+                            value={newSubtask.notificationTime}
+                            onChange={(e) => setNewSubtask({ 
+                              ...newSubtask, 
+                              notificationTime: e.target.value 
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={handleSaveSubtask}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                {editingSubtask ? '更新' : '追加'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddDialog(false);
+                  setEditingSubtask(null);
+                  setNewSubtask({
+                    title: '',
+                    description: '',
+                    dueDate: '',
+                    priority: 'medium',
+                    notificationType: 'none',
+                    daysBefore: 1,
+                    notificationTime: '09:00',
+                  });
+                }}
+                className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -40,7 +40,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         status: taskData.status,
         priority: taskData.priority,
         parentId: taskData.parentId,
-        dueDate: taskData.dueDate?.toISOString(),
+        dueDate: taskData.dueDate,
         notificationSettings: taskData.notificationSettings,
       };
 
@@ -80,7 +80,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         status: updateData.status,
         priority: updateData.priority,
         parentId: updateData.parentId,
-        dueDate: updateData.dueDate?.toISOString(),
+        dueDate: updateData.dueDate,
         notificationSettings: updateData.notificationSettings,
       };
 
