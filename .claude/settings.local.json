@@ -46,7 +46,8 @@
       "Bash(npm install:*)",
       "Bash(find:*)",
       "Bash(cargo:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

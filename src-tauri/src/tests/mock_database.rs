@@ -78,7 +78,7 @@ pub fn create_test_task_with_notifications() -> Task {
         title: "Test Notification Task".to_string(),
         description: Some("Testing notification settings".to_string()),
         status: "todo".to_string(),
-        priority: "medium".to_string(),
+        // priority field removed as per .kiro/specs/notification-system-redesign
         parent_id: None,
         due_date: None,
         completed_at: None,
@@ -100,7 +100,7 @@ pub fn create_test_task_due_date_based() -> Task {
         title: "Test Due Date Task".to_string(),
         description: Some("Testing due date notification".to_string()),
         status: "todo".to_string(),
-        priority: "high".to_string(),
+        // priority field removed as per .kiro/specs/notification-system-redesign
         parent_id: None,
         due_date: Some("2025-12-31T23:59:59Z".to_string()),
         completed_at: None,

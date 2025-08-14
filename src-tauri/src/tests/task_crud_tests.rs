@@ -1,4 +1,4 @@
-use crate::models::{Task, TaskStatus, Priority, CreateTaskRequest};
+use crate::models::{Task, TaskStatus, CreateTaskRequest};
 use crate::tests::mock_database::{MockDatabase, create_test_task_with_notifications};
 use crate::error::AppError;
 use uuid::Uuid;
@@ -16,7 +16,7 @@ async fn test_basic_task_crud_operations() {
         title: "Test Task".to_string(),
         description: Some("Test description".to_string()),
         status: TaskStatus::Todo,
-        priority: Priority::Medium,
+        // priority: Priority::Medium, // removed as per .kiro spec
         parent_id: None,
         due_date: None,
         notification_settings: None,
@@ -27,7 +27,7 @@ async fn test_basic_task_crud_operations() {
         title: create_request.title.clone(),
         description: create_request.description.clone(),
         status: "todo".to_string(),
-        priority: "medium".to_string(),
+        // priority: "medium".to_string(), // removed as per .kiro spec
         parent_id: create_request.parent_id.clone(),
         due_date: None,
         completed_at: None,

@@ -187,7 +187,6 @@ pub async fn update_task_notification_settings(
         title: None,
         description: None,
         status: None,
-        priority: None,
         parent_id: None,
         due_date: None,
         notification_settings: Some(notification_settings),

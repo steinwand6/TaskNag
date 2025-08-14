@@ -25,7 +25,7 @@ impl TaskService {
             title: request.title,
             description: request.description,
             status: request.status.to_string(),
-            priority: request.priority.to_string(),
+            // priority field removed as per .kiro/specs/notification-system-redesign
             parent_id: request.parent_id,
             due_date: request.due_date.map(|d| d.to_rfc3339()),
             completed_at: None,
@@ -45,18 +45,17 @@ impl TaskService {
         sqlx::query(
             r#"
             INSERT INTO tasks (
-                id, title, description, status, priority, parent_id, due_date, completed_at, 
+                id, title, description, status, parent_id, due_date, completed_at, 
                 created_at, updated_at, progress, notification_type, notification_days_before, 
                 notification_time, notification_days_of_week, notification_level
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
             "#,
         )
         .bind(&task.id)
         .bind(&task.title)
         .bind(&task.description)
         .bind(&task.status)
-        .bind(&task.priority)
         .bind(&task.parent_id)
         .bind(&task.due_date)
         .bind(&task.completed_at)
@@ -77,7 +76,7 @@ impl TaskService {
     pub async fn get_tasks(&self) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             ORDER BY 
                 CASE status 
@@ -86,11 +85,11 @@ impl TaskService {
                     WHEN 'in_progress' THEN 3
                     WHEN 'done' THEN 4
                 END,
-                CASE priority
-                    WHEN 'required' THEN 1
-                    WHEN 'high' THEN 2
-                    WHEN 'medium' THEN 3
-                    WHEN 'low' THEN 4
+                CASE notification_level
+                    WHEN 3 THEN 1
+                    WHEN 2 THEN 2
+                    WHEN 1 THEN 3
+                    ELSE 4
                 END,
                 created_at DESC
             "#,
@@ -104,7 +103,7 @@ impl TaskService {
     pub async fn get_task_by_id(&self, id: &str) -> Result<Task, AppError> {
         let task = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE id = ?1
             "#,
@@ -136,9 +135,7 @@ impl TaskService {
                 task.completed_at = None;
             }
         }
-        if let Some(priority) = request.priority {
-            task.priority = priority.to_string();
-        }
+        // priority field removed as per .kiro/specs/notification-system-redesign
         if request.parent_id.is_some() {
             task.parent_id = request.parent_id;
         }
@@ -162,10 +159,10 @@ impl TaskService {
         sqlx::query(
             r#"
             UPDATE tasks
-            SET title = ?2, description = ?3, status = ?4, priority = ?5, 
-                parent_id = ?6, due_date = ?7, completed_at = ?8, updated_at = ?9, progress = ?10,
-                notification_type = ?11, notification_days_before = ?12, notification_time = ?13,
-                notification_days_of_week = ?14, notification_level = ?15
+            SET title = ?2, description = ?3, status = ?4, 
+                parent_id = ?5, due_date = ?6, completed_at = ?7, updated_at = ?8, progress = ?9,
+                notification_type = ?10, notification_days_before = ?11, notification_time = ?12,
+                notification_days_of_week = ?13, notification_level = ?14
             WHERE id = ?1
             "#,
         )
@@ -173,7 +170,6 @@ impl TaskService {
         .bind(&task.title)
         .bind(&task.description)
         .bind(&task.status)
-        .bind(&task.priority)
         .bind(&task.parent_id)
         .bind(&task.due_date)
         .bind(&task.completed_at)
@@ -206,15 +202,15 @@ impl TaskService {
     pub async fn get_tasks_by_status(&self, status: &str) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE status = ?1
             ORDER BY 
-                CASE priority
-                    WHEN 'required' THEN 1
-                    WHEN 'high' THEN 2
-                    WHEN 'medium' THEN 3
-                    WHEN 'low' THEN 4
+                CASE notification_level
+                    WHEN 3 THEN 1
+                    WHEN 2 THEN 2
+                    WHEN 1 THEN 3
+                    ELSE 4
                 END,
                 created_at DESC
             "#,
@@ -237,7 +233,6 @@ impl TaskService {
             title: None,
             description: None,
             status: Some(status),
-            priority: None,
             parent_id: None,
             due_date: None,
             notification_settings: None,
@@ -262,7 +257,7 @@ impl TaskService {
     pub async fn get_children(&self, parent_id: &str) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE parent_id = ?1
             ORDER BY created_at ASC
@@ -373,7 +368,7 @@ impl TaskService {
     pub async fn get_root_tasks(&self) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE parent_id IS NULL
             ORDER BY 
@@ -383,11 +378,11 @@ impl TaskService {
                     WHEN 'in_progress' THEN 3
                     WHEN 'done' THEN 4
                 END,
-                CASE priority
-                    WHEN 'required' THEN 1
-                    WHEN 'high' THEN 2
-                    WHEN 'medium' THEN 3
-                    WHEN 'low' THEN 4
+                CASE notification_level
+                    WHEN 3 THEN 1
+                    WHEN 2 THEN 2
+                    WHEN 1 THEN 3
+                    ELSE 4
                 END,
                 created_at DESC
             "#,
@@ -404,7 +399,7 @@ impl TaskService {
         
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, priority, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
             FROM tasks
             WHERE status != 'done' 
               AND notification_type IS NOT NULL 

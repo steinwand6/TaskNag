@@ -1,8 +1,8 @@
 // Task status type
 export type TaskStatus = 'inbox' | 'todo' | 'in_progress' | 'done';
 
-// Priority type
-export type Priority = 'low' | 'medium' | 'high' | 'required';
+// Priority type REMOVED as per .kiro/specs/notification-system-redesign
+// Individual notification settings replace the priority system
 // 新しい通知設定の型定義
 export interface TaskNotificationSettings {
   notificationType: 'none' | 'due_date_based' | 'recurring';
@@ -26,7 +26,7 @@ export interface Task {
   title: string;
   description?: string;
   status: TaskStatus;
-  priority: Priority; // 一時的に保持（段階的移行）
+  // priority field REMOVED as per .kiro/specs/notification-system-redesign
   parentId?: string;
   children?: Task[];
   dueDate?: Date;
@@ -43,7 +43,7 @@ export interface CreateTaskRequest {
   title: string;
   description?: string;
   status: TaskStatus;
-  priority: Priority; // 一時的に保持
+  // priority field REMOVED as per .kiro/specs/notification-system-redesign
   parentId?: string;
   dueDate?: Date;
   notificationSettings?: TaskNotificationSettings;
@@ -53,7 +53,7 @@ export interface UpdateTaskRequest {
   title?: string;
   description?: string;
   status?: TaskStatus;
-  priority?: Priority; // 一時的に保持
+  // priority field REMOVED as per .kiro/specs/notification-system-redesign
   parentId?: string;
   dueDate?: Date;
   notificationSettings?: TaskNotificationSettings;
