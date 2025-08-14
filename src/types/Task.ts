@@ -86,12 +86,26 @@ export interface TaskStore {
   tags: Tag[];
   isLoading: boolean;
   error: Error | null;
+  // フィルタリング状態
+  selectedTags: string[]; // 選択中のタグID
+  searchQuery: string;
+  showCompletedTasks: boolean;
+  
   loadTasks: () => Promise<void>;
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   moveTask: (id: string, newStatus: TaskStatus) => Promise<void>;
   getTasksByStatus: (status: TaskStatus) => Task[];
+  
+  // フィルタリング機能
+  getFilteredTasks: () => Task[];
+  setSelectedTags: (tagIds: string[]) => void;
+  toggleTag: (tagId: string) => void;
+  clearTagFilter: () => void;
+  setSearchQuery: (query: string) => void;
+  setShowCompletedTasks: (show: boolean) => void;
+  
   // タグ関連の操作
   loadTags: () => Promise<void>;
   createTag: (tag: CreateTagRequest) => Promise<Tag>;

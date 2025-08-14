@@ -48,7 +48,15 @@
       "Bash(cargo:*)",
       "Bash(grep:*)",
       "Bash(dir:*)",
-      "Bash(npm test)"
+      "Bash(npm test)",
+      "Bash(timeout:*)",
+      "Bash(cmd /c:*)",
+      "Bash(set VITE_PORT=5174)",
+      "Bash(scriptsdev.bat status)",
+      "Bash(scripts/dev.bat status)",
+      "Bash(scriptsdev.bat stop)",
+      "Bash(scripts/dev.bat:*)",
+      "Bash(mv:*)"
     ],
     "deny": [],
     "ask": [],

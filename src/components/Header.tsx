@@ -7,9 +7,22 @@ interface HeaderProps {
   showDone: boolean;
   onToggleDone: () => void;
   onManageTags?: () => void;
+  onToggleFilters?: () => void;
+  showFilters?: boolean;
+  hasActiveFilters?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ isLoading, onNewTask, onRefresh, showDone, onToggleDone, onManageTags }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+  isLoading, 
+  onNewTask, 
+  onRefresh, 
+  showDone, 
+  onToggleDone, 
+  onManageTags, 
+  onToggleFilters, 
+  showFilters = false, 
+  hasActiveFilters = false 
+}) => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -23,6 +36,22 @@ export const Header: React.FC<HeaderProps> = ({ isLoading, onNewTask, onRefresh,
             </p>
           </div>
           <div className="flex items-center space-x-4">
+            {onToggleFilters && (
+              <button 
+                onClick={onToggleFilters}
+                className={`px-3 py-2 text-sm rounded-md transition-colors relative ${
+                  showFilters 
+                    ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                    : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                }`}
+                disabled={isLoading}
+              >
+                🔍 フィルタ
+                {hasActiveFilters && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                )}
+              </button>
+            )}
             {onManageTags && (
               <button 
                 onClick={onManageTags}

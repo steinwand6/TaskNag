@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Task } from '../types/Task';
 import { TaskService } from '../services/taskService';
@@ -15,17 +15,7 @@ export const TaskDetailPage: React.FC = () => {
   // デバッグ用
   console.log('TaskDetailPage rendered with taskId:', taskId);
 
-  useEffect(() => {
-    if (!taskId) {
-      setError('タスクIDが見つかりません');
-      setLoading(false);
-      return;
-    }
-
-    loadTask();
-  }, [taskId]);
-
-  const loadTask = async () => {
+  const loadTask = useCallback(async () => {
     if (!taskId) return;
     
     try {
@@ -40,7 +30,17 @@ export const TaskDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [taskId]);
+
+  useEffect(() => {
+    if (!taskId) {
+      setError('タスクIDが見つかりません');
+      setLoading(false);
+      return;
+    }
+
+    loadTask();
+  }, [taskId, loadTask]);
 
   const handleTaskUpdate = (updatedTask: Task) => {
     console.log('TaskDetailPage: handleTaskUpdate called with:', updatedTask);

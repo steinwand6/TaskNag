@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Task } from '../types/Task';
 import { TaskService } from '../services/taskService';
 import { ProgressBar } from './ProgressBar';
@@ -30,7 +30,7 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
     return Math.round((completedCount / childTasks.length) * 100);
   };
 
-  const loadChildren = async () => {
+  const loadChildren = useCallback(async () => {
     if (!parentTask.id) return;
     
     setIsLoading(true);
@@ -42,13 +42,13 @@ export const SubTaskList: React.FC<SubTaskListProps> = ({ parentTask, onTaskUpda
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [parentTask.id]);
 
   useEffect(() => {
     if (isExpanded) {
       loadChildren();
     }
-  }, [isExpanded, parentTask.id]);
+  }, [isExpanded, parentTask.id, loadChildren]);
 
   const handleDelete = async (taskId: string) => {
     if (!confirm('この子タスクを削除しますか？')) return;

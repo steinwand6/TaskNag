@@ -7,13 +7,14 @@ import { KanbanColumn } from './components/KanbanColumn';
 import { ErrorMessage } from './components/ErrorMessage';
 import { LoadingIndicator } from './components/LoadingIndicator';
 import { TagManager } from './components/TagManager';
+import { TaskFilter } from './components/TaskFilter';
 import { STATUS_CONFIG, VISIBLE_STATUSES } from './constants';
 import { useModal, useDragAndDrop, useNotifications } from './hooks';
 
 import { LogService } from './services/logService';
 
 function App() {
-  const { getTasksByStatus, moveTask, loadTasks, loadTags, isLoading, error } = useTaskStore();
+  const { getFilteredTasks, moveTask, loadTasks, loadTags, isLoading, error, selectedTags, searchQuery } = useTaskStore();
   
   // State for showing done tasks
   const [showDone, setShowDone] = React.useState(false);
@@ -21,10 +22,13 @@ function App() {
   // State for tag manager modal
   const [showTagManager, setShowTagManager] = React.useState(false);
   
+  // State for showing filter panel
+  const [showFilters, setShowFilters] = React.useState(false);
+  
   // Custom hooks
   const { isModalOpen, modalInitialStatus, openModal, closeModal } = useModal();
   const dragAndDropHandlers = useDragAndDrop(moveTask);
-  const { } = useNotifications();
+  useNotifications();
 
   // Load tasks and tags on component mount
   React.useEffect(() => {
@@ -39,7 +43,8 @@ function App() {
     : VISIBLE_STATUSES;
 
   const getStatusData = (status: TaskStatus) => {
-    const statusTasks = getTasksByStatus(status);
+    const filteredTasks = getFilteredTasks();
+    const statusTasks = filteredTasks.filter(task => task.status === status);
     
     return {
       ...STATUS_CONFIG[status],
@@ -61,10 +66,20 @@ function App() {
         showDone={showDone}
         onToggleDone={() => setShowDone(!showDone)}
         onManageTags={() => setShowTagManager(true)}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        showFilters={showFilters}
+        hasActiveFilters={selectedTags.length > 0 || searchQuery.trim().length > 0}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {isLoading && <LoadingIndicator />}
+        
+        {/* フィルタパネル */}
+        {showFilters && (
+          <div className="mb-6">
+            <TaskFilter />
+          </div>
+        )}
         
         <div className={`grid grid-cols-1 gap-6 ${showDone ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           {displayStatuses.map((status) => {

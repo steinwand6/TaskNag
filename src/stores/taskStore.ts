@@ -10,6 +10,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   isLoading: false,
   error: null,
   
+  // フィルタリング状態
+  selectedTags: [],
+  searchQuery: '',
+  showCompletedTasks: true,
+  
   // Load root tasks from backend (tasks without parent)
   loadTasks: async () => {
     set({ isLoading: true, error: null });
@@ -308,5 +313,68 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       LogService.error('TaskStore.getTagsForTask error', error);
       throw error;
     }
+  },
+
+  // フィルタリング機能
+  getFilteredTasks: () => {
+    const { tasks, selectedTags, searchQuery, showCompletedTasks } = get();
+    
+    return tasks.filter(task => {
+      // 完了タスクフィルタ
+      if (!showCompletedTasks && task.status === 'done') {
+        return false;
+      }
+      
+      // タグフィルタ
+      if (selectedTags.length > 0) {
+        const taskTagIds = task.tags?.map(tag => tag.id) || [];
+        const hasSelectedTag = selectedTags.some(selectedTagId => 
+          taskTagIds.includes(selectedTagId)
+        );
+        if (!hasSelectedTag) {
+          return false;
+        }
+      }
+      
+      // 検索クエリフィルタ
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const titleMatch = task.title.toLowerCase().includes(query);
+        const descriptionMatch = task.description?.toLowerCase().includes(query) || false;
+        const tagMatch = task.tags?.some(tag => 
+          tag.name.toLowerCase().includes(query)
+        ) || false;
+        
+        if (!titleMatch && !descriptionMatch && !tagMatch) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  },
+
+  setSelectedTags: (tagIds) => {
+    set({ selectedTags: tagIds });
+  },
+
+  toggleTag: (tagId) => {
+    set(state => ({
+      selectedTags: state.selectedTags.includes(tagId)
+        ? state.selectedTags.filter(id => id !== tagId)
+        : [...state.selectedTags, tagId]
+    }));
+  },
+
+  clearTagFilter: () => {
+    set({ selectedTags: [] });
+  },
+
+  setSearchQuery: (query) => {
+    set({ searchQuery: query });
+  },
+
+  setShowCompletedTasks: (show) => {
+    set({ showCompletedTasks: show });
   },
 }));

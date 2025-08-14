@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "scripts\\dev.bat start",
+    "tauri:stop": "scripts\\dev.bat stop",
+    "tauri:restart": "scripts\\dev.bat restart",
+    "tauri:status": "scripts\\dev.bat status"
   },
   "repository": {
     "type": "git",

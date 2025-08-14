@@ -1,6 +1,7 @@
 import React from 'react';
-import { Task, TaskStatus, TaskNotificationSettings } from '../types/Task';
+import { Task, TaskStatus, TaskNotificationSettings, Tag } from '../types/Task';
 import { NotificationSettings } from './NotificationSettings';
+import { TagDisplay } from './TagDisplay';
 import { useTaskStore } from '../stores/taskStore';
 import { DEFAULT_TASK_STATUS, STATUS_OPTIONS } from '../constants/taskStatus';
 import { LogService } from '../services/logService';
@@ -17,7 +18,13 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
     LogService.info('EditTaskModal: onCloseが呼ばれました');
     onClose();
   };
-  const { updateTask } = useTaskStore();
+  const { updateTask, tags, loadTags } = useTaskStore();
+  
+  // タグ管理用状態
+  const [selectedTags, setSelectedTags] = React.useState<Tag[]>([]);
+  const [showTagSelector, setShowTagSelector] = React.useState(false);
+  const [newTagName, setNewTagName] = React.useState('');
+  const [newTagColor, setNewTagColor] = React.useState('#3b82f6');
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
@@ -42,8 +49,14 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
           level: 1,
         },
       });
+      setSelectedTags(task.tags || []);
     }
   }, [task]);
+  
+  // Load tags when component mounts
+  React.useEffect(() => {
+    loadTags();
+  }, [loadTags]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +69,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
       status: formData.status,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
       notificationSettings: formData.notificationSettings,
+      tags: selectedTags,
     });
     
     handleClose();
@@ -65,6 +79,40 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
     LogService.info('EditTaskModal: 通知設定が変更されました', JSON.stringify(settings));
     setFormData({ ...formData, notificationSettings: settings });
   };
+  
+  // タグ関連のハンドラー
+  const handleAddTag = (tag: Tag) => {
+    if (!selectedTags.find(t => t.id === tag.id)) {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
+  
+  const handleRemoveTag = (tagId: string) => {
+    setSelectedTags(selectedTags.filter(tag => tag.id !== tagId));
+  };
+  
+  const handleCreateNewTag = async () => {
+    if (!newTagName.trim()) return;
+    
+    // 新しいタグを作成（実際の実装では addTagToTask を使用）
+    const tempId = `temp-${Date.now()}`;
+    const newTag: Tag = {
+      id: tempId,
+      name: newTagName.trim(),
+      color: newTagColor,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    setSelectedTags([...selectedTags, newTag]);
+    setNewTagName('');
+    setNewTagColor('#3b82f6');
+    setShowTagSelector(false);
+  };
+  
+  const availableTags = tags.filter(tag => 
+    !selectedTags.find(selected => selected.id === tag.id)
+  );
   
   if (!isOpen || !task) return null;
   
@@ -139,6 +187,99 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
               onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+          
+          {/* タグ管理セクション */}
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                タグ
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowTagSelector(!showTagSelector)}
+                className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              >
+                <span>+</span> タグを追加
+              </button>
+            </div>
+            
+            {/* 現在のタグ */}
+            {selectedTags.length > 0 && (
+              <div className="mb-2">
+                <TagDisplay 
+                  tags={selectedTags}
+                  maxDisplay={10}
+                  size="md"
+                  showRemoveButton={true}
+                  onRemove={handleRemoveTag}
+                />
+              </div>
+            )}
+            
+            {/* タグセレクター */}
+            {showTagSelector && (
+              <div className="bg-gray-50 p-3 rounded-md space-y-3">
+                {/* 既存タグから選択 */}
+                {availableTags.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-600 mb-2">既存のタグから選択</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {availableTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => handleAddTag(tag)}
+                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all"
+                          style={{
+                            backgroundColor: tag.color + '10',
+                            color: tag.color,
+                          }}
+                        >
+                          {tag.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 新しいタグを作成 */}
+                <div>
+                  <h4 className="text-xs font-medium text-gray-600 mb-2">新しいタグを作成</h4>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="タグ名"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input
+                      type="color"
+                      value={newTagColor}
+                      onChange={(e) => setNewTagColor(e.target.value)}
+                      className="w-8 h-7 border border-gray-300 rounded cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateNewTag}
+                      disabled={!newTagName.trim()}
+                      className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      追加
+                    </button>
+                  </div>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setShowTagSelector(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  閉じる
+                </button>
+              </div>
+            )}
           </div>
           
           {/* 通知設定セクション */}

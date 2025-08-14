@@ -16,7 +16,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDragStart, 
   onDragEnd 
 }) => {
-  const { deleteTask, moveTask } = useTaskStore();
+  const { deleteTask, moveTask, toggleTag } = useTaskStore();
   const navigate = useNavigate();
   const [editTask, setEditTask] = React.useState<Task | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -170,7 +170,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         {/* タグ表示 */}
         {task.tags && task.tags.length > 0 && (
           <div className="mb-2">
-            <TagDisplay tags={task.tags} maxDisplay={2} size="sm" />
+            <TagDisplay 
+              tags={task.tags} 
+              maxDisplay={2} 
+              size="sm" 
+              onClick={(tag) => toggleTag(tag.id)}
+            />
           </div>
         )}
         
