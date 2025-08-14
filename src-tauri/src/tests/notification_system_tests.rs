@@ -1,6 +1,5 @@
-use crate::models::{Task, TaskNotificationSettings, TaskNotification};
+use crate::models::{Task, TaskNotification};
 use crate::tests::mock_database::{MockDatabase, create_test_task_with_notifications, create_test_task_due_date_based};
-use crate::services::TaskService;
 use uuid::Uuid;
 use chrono::{Utc, DateTime, Duration, Weekday, Datelike, Timelike};
 
@@ -145,6 +144,7 @@ impl MockNotificationService {
 }
 
 /// 期日ベース通知のテスト
+#[tokio::test]
 async fn test_due_date_based_notifications() {
     let service = MockNotificationService::new();
     
@@ -238,6 +238,7 @@ async fn test_due_date_based_notifications() {
 }
 
 /// 定期通知のテスト
+#[tokio::test]
 async fn test_recurring_notifications() {
     let service = MockNotificationService::new();
     
@@ -351,7 +352,7 @@ async fn test_recurring_notifications() {
     let is_weekday = matches!(test_time.weekday(), Weekday::Mon | Weekday::Tue | Weekday::Wed | Weekday::Thu | Weekday::Fri);
     
     if is_weekday {
-        let weekday_found = same_time_notifications
+        let _weekday_found = same_time_notifications
             .iter()
             .any(|n| n.title == "Weekday Standup");
         // Note: This might not always be true depending on the current day
@@ -362,6 +363,7 @@ async fn test_recurring_notifications() {
 }
 
 /// 通知レベル別動作のテスト
+#[tokio::test]
 async fn test_notification_levels() {
     let service = MockNotificationService::new();
     
@@ -371,7 +373,7 @@ async fn test_notification_levels() {
     let levels = [1, 2, 3];
     let level_descriptions = ["System only", "System + Sound", "Maximize + System + Sound"];
     
-    for (i, level) in levels.iter().enumerate() {
+    for (_i, level) in levels.iter().enumerate() {
         let mut task = create_test_task_with_notifications();
         task.id = Uuid::new_v4().to_string();
         task.title = format!("Level {} Task", level);
@@ -418,6 +420,7 @@ async fn test_notification_levels() {
 }
 
 /// 通知タイミングの精密テスト
+#[tokio::test]
 async fn test_notification_timing_precision() {
     let service = MockNotificationService::new();
     
@@ -507,6 +510,7 @@ async fn test_notification_timing_precision() {
 }
 
 /// 複合シナリオのテスト
+#[tokio::test]
 async fn test_complex_notification_scenarios() {
     let service = MockNotificationService::new();
     
@@ -619,28 +623,28 @@ async fn test_complex_notification_scenarios() {
 }
 
 /// 通知システムテストのメインランナー
-#[tokio::test]
-async fn notification_system_tests() {
+#[test]
+fn notification_system_tests() {
     println!("🧪 Starting comprehensive notification system tests...");
     
     // Test 1: Due date based notifications
-    test_due_date_based_notifications().await;
+    test_due_date_based_notifications();
     println!("✅ Due date based notifications test PASSED");
     
     // Test 2: Recurring notifications
-    test_recurring_notifications().await;
+    test_recurring_notifications();
     println!("✅ Recurring notifications test PASSED");
     
     // Test 3: Notification levels
-    test_notification_levels().await;
+    test_notification_levels();
     println!("✅ Notification levels test PASSED");
     
     // Test 4: Notification timing precision
-    test_notification_timing_precision().await;
+    test_notification_timing_precision();
     println!("✅ Notification timing precision test PASSED");
     
     // Test 5: Complex notification scenarios
-    test_complex_notification_scenarios().await;
+    test_complex_notification_scenarios();
     println!("✅ Complex notification scenarios test PASSED");
     
     println!("🎉 All notification system tests completed!");

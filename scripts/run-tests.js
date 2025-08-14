@@ -218,7 +218,8 @@ async function runAllTests(testType = 'all') {
         'task_crud_tests', 
         'hierarchical_task_tests',
         'notification_system_tests',
-        'error_handling_tests'
+        'error_handling_tests',
+        'subtask_notification_tests'
       ];
       
       let allTestsPassed = true;

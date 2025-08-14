@@ -1,8 +1,4 @@
-use crate::models::{Task, TaskNotificationSettings, CreateTaskRequest, UpdateTaskRequest, TaskStatus, Priority};
-use futures;
 use crate::tests::mock_database::{MockDatabase, create_test_task_with_notifications, create_test_task_due_date_based};
-use crate::services::TaskService;
-use crate::database::Database;
 use uuid::Uuid;
 
 #[tokio::test]

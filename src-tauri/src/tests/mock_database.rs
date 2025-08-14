@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use crate::models::{Task, TaskStatus, Priority};
+use crate::models::Task;
 use crate::error::AppError;
 use uuid::Uuid;
 use chrono::Utc;

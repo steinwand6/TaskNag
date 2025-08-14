@@ -1,10 +1,10 @@
-use crate::models::{Task, TaskStatus, Priority, CreateTaskRequest, UpdateTaskRequest};
+use crate::models::Task;
 use crate::tests::mock_database::{MockDatabase, create_test_task_with_notifications};
-use crate::error::AppError;
 use uuid::Uuid;
 use chrono::Utc;
 
 /// 親子タスク関係のテスト
+#[tokio::test]
 async fn test_parent_child_task_relationships() {
     let mock_db = MockDatabase::new();
     
@@ -66,6 +66,7 @@ async fn test_parent_child_task_relationships() {
 }
 
 /// 進捗率計算のテスト
+#[tokio::test]
 async fn test_progress_calculation() {
     let mock_db = MockDatabase::new();
     
@@ -151,6 +152,7 @@ async fn test_progress_calculation() {
 }
 
 /// 複数レベル階層のテスト
+#[tokio::test]
 async fn test_multi_level_hierarchy() {
     let mock_db = MockDatabase::new();
     
@@ -257,6 +259,7 @@ async fn test_multi_level_hierarchy() {
 }
 
 /// 階層タスクのステータス更新テスト
+#[tokio::test]
 async fn test_hierarchical_status_updates() {
     let mock_db = MockDatabase::new();
     
@@ -369,6 +372,7 @@ async fn test_hierarchical_status_updates() {
 }
 
 /// 階層タスクの制約テスト
+#[tokio::test]
 async fn test_hierarchical_constraints() {
     let mock_db = MockDatabase::new();
     
@@ -454,6 +458,7 @@ async fn test_hierarchical_constraints() {
 }
 
 /// 階層タスク検索とフィルタリングのテスト
+#[tokio::test]
 async fn test_hierarchical_search_and_filtering() {
     let mock_db = MockDatabase::new();
     
@@ -576,32 +581,32 @@ async fn test_hierarchical_search_and_filtering() {
 }
 
 /// 階層タスクテストのメインランナー
-#[tokio::test]
-async fn hierarchical_task_tests() {
+#[test]
+fn hierarchical_task_tests() {
     println!("🧪 Starting comprehensive hierarchical task tests...");
     
     // Test 1: Parent-child relationships
-    test_parent_child_task_relationships().await;
+    test_parent_child_task_relationships();
     println!("✅ Parent-child relationships test PASSED");
     
     // Test 2: Progress calculation
-    test_progress_calculation().await;
+    test_progress_calculation();
     println!("✅ Progress calculation test PASSED");
     
     // Test 3: Multi-level hierarchy
-    test_multi_level_hierarchy().await;
+    test_multi_level_hierarchy();
     println!("✅ Multi-level hierarchy test PASSED");
     
     // Test 4: Hierarchical status updates
-    test_hierarchical_status_updates().await;
+    test_hierarchical_status_updates();
     println!("✅ Hierarchical status updates test PASSED");
     
     // Test 5: Hierarchical constraints
-    test_hierarchical_constraints().await;
+    test_hierarchical_constraints();
     println!("✅ Hierarchical constraints test PASSED");
     
     // Test 6: Hierarchical search and filtering
-    test_hierarchical_search_and_filtering().await;
+    test_hierarchical_search_and_filtering();
     println!("✅ Hierarchical search and filtering test PASSED");
     
     println!("🎉 All hierarchical task tests completed!");

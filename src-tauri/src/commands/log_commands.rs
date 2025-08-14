@@ -1,11 +1,11 @@
 use std::fs::OpenOptions;
 use std::io::Write;
 use chrono::Utc;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 #[tauri::command]
 pub async fn write_log(
-    app: AppHandle,
+    _app: AppHandle,
     level: String,
     message: String,
     data: Option<String>,
@@ -59,7 +59,7 @@ pub async fn get_log_file_path(_app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn read_recent_logs(_app: AppHandle, lines: Option<usize>) -> Result<String, String> {
+pub async fn read_recent_logs(__app: AppHandle, lines: Option<usize>) -> Result<String, String> {
     // Use current working directory for logs during development
     let logs_dir = std::env::current_dir()
         .map_err(|e| format!("Failed to get current dir: {}", e))?

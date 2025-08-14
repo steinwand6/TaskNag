@@ -1,10 +1,10 @@
-use crate::models::{Task, TaskStatus, Priority, CreateTaskRequest, UpdateTaskRequest, TaskNotificationSettings};
 use crate::tests::mock_database::{MockDatabase, create_test_task_with_notifications};
 use crate::error::AppError;
 use uuid::Uuid;
 use chrono::Utc;
 
 /// エラーハンドリングの基本テスト
+#[tokio::test]
 async fn test_basic_error_handling() {
     let mock_db = MockDatabase::new();
     
@@ -60,6 +60,7 @@ async fn test_basic_error_handling() {
 }
 
 /// データバリデーションエラーのテスト
+#[tokio::test]
 async fn test_data_validation_errors() {
     println!("🧪 Testing data validation errors...");
     
@@ -169,6 +170,7 @@ async fn test_data_validation_errors() {
 }
 
 /// 業務ロジックエラーのテスト
+#[tokio::test]
 async fn test_business_logic_errors() {
     let mock_db = MockDatabase::new();
     
@@ -266,6 +268,7 @@ async fn test_business_logic_errors() {
 }
 
 /// 並行処理エラーのテスト
+#[tokio::test]
 async fn test_concurrency_errors() {
     let mock_db = MockDatabase::new();
     
@@ -353,6 +356,7 @@ async fn test_concurrency_errors() {
 }
 
 /// リソースエラーのテスト
+#[tokio::test]
 async fn test_resource_errors() {
     println!("🧪 Testing resource errors...");
     
@@ -446,6 +450,7 @@ async fn test_resource_errors() {
 }
 
 /// エラー回復テスト
+#[tokio::test]
 async fn test_error_recovery() {
     let mock_db = MockDatabase::new();
     
@@ -512,32 +517,32 @@ async fn test_error_recovery() {
 }
 
 /// エラーハンドリングテストのメインランナー
-#[tokio::test]
-async fn error_handling_tests() {
+#[test]
+fn error_handling_tests() {
     println!("🧪 Starting comprehensive error handling tests...");
     
     // Test 1: Basic error handling
-    test_basic_error_handling().await;
+    test_basic_error_handling();
     println!("✅ Basic error handling test PASSED");
     
     // Test 2: Data validation errors
-    test_data_validation_errors().await;
+    test_data_validation_errors();
     println!("✅ Data validation errors test PASSED");
     
     // Test 3: Business logic errors
-    test_business_logic_errors().await;
+    test_business_logic_errors();
     println!("✅ Business logic errors test PASSED");
     
     // Test 4: Concurrency errors
-    test_concurrency_errors().await;
+    test_concurrency_errors();
     println!("✅ Concurrency errors test PASSED");
     
     // Test 5: Resource errors
-    test_resource_errors().await;
+    test_resource_errors();
     println!("✅ Resource errors test PASSED");
     
     // Test 6: Error recovery
-    test_error_recovery().await;
+    test_error_recovery();
     println!("✅ Error recovery test PASSED");
     
     println!("🎉 All error handling tests completed!");

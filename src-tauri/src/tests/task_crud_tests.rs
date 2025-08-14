@@ -1,11 +1,11 @@
-use crate::models::{Task, TaskStatus, Priority, CreateTaskRequest, UpdateTaskRequest, TaskNotificationSettings};
+use crate::models::{Task, TaskStatus, Priority, CreateTaskRequest};
 use crate::tests::mock_database::{MockDatabase, create_test_task_with_notifications};
-use crate::services::TaskService;
 use crate::error::AppError;
 use uuid::Uuid;
 use chrono::Utc;
 
 /// 基本的なタスクCRUD操作のテスト
+#[tokio::test]
 async fn test_basic_task_crud_operations() {
     let mock_db = MockDatabase::new();
     
@@ -91,6 +91,7 @@ async fn test_basic_task_crud_operations() {
 }
 
 /// ステータス変更のテスト
+#[tokio::test]
 async fn test_task_status_transitions() {
     let mock_db = MockDatabase::new();
     
@@ -103,7 +104,7 @@ async fn test_task_status_transitions() {
     // Test status progression: todo -> in_progress -> done
     let statuses = ["todo", "in_progress", "done"];
     
-    for (i, status) in statuses.iter().enumerate() {
+    for (_i, status) in statuses.iter().enumerate() {
         let mut updated_task = mock_db.get_task_by_id(&created_task.id).unwrap();
         updated_task.status = status.to_string();
         
@@ -132,6 +133,7 @@ async fn test_task_status_transitions() {
 }
 
 /// 優先度管理のテスト
+#[tokio::test]
 async fn test_task_priority_management() {
     let mock_db = MockDatabase::new();
     
@@ -172,6 +174,7 @@ async fn test_task_priority_management() {
 }
 
 /// 期日管理のテスト
+#[tokio::test]
 async fn test_task_due_date_management() {
     let mock_db = MockDatabase::new();
     
@@ -232,6 +235,7 @@ async fn test_task_due_date_management() {
 }
 
 /// 進捗管理のテスト
+#[tokio::test]
 async fn test_task_progress_management() {
     let mock_db = MockDatabase::new();
     
@@ -282,6 +286,7 @@ async fn test_task_progress_management() {
 }
 
 /// バリデーションとエラーケースのテスト
+#[tokio::test]
 async fn test_task_validation_and_error_cases() {
     let mock_db = MockDatabase::new();
     
@@ -354,6 +359,7 @@ async fn test_task_validation_and_error_cases() {
 }
 
 /// 一括操作のテスト
+#[tokio::test]
 async fn test_bulk_task_operations() {
     let mock_db = MockDatabase::new();
     
@@ -419,37 +425,37 @@ async fn test_bulk_task_operations() {
     println!("🎉 All bulk operations tests passed!");
 }
 
-/// 総合的なCRUDテストランナー
-#[tokio::test]
-async fn task_crud_tests() {
+/// 総合的なCRUDテストランナー  
+#[test]
+fn task_crud_tests() {
     println!("🧪 Starting comprehensive task CRUD tests...");
     
     // Test 1: Basic CRUD operations
-    test_basic_task_crud_operations().await;
+    test_basic_task_crud_operations();
     println!("✅ Basic CRUD operations test PASSED");
     
     // Test 2: Status transitions
-    test_task_status_transitions().await;
+    test_task_status_transitions();
     println!("✅ Status transitions test PASSED");
     
     // Test 3: Priority management
-    test_task_priority_management().await;
+    test_task_priority_management();
     println!("✅ Priority management test PASSED");
     
     // Test 4: Due date management
-    test_task_due_date_management().await;
+    test_task_due_date_management();
     println!("✅ Due date management test PASSED");
     
     // Test 5: Progress management
-    test_task_progress_management().await;
+    test_task_progress_management();
     println!("✅ Progress management test PASSED");
     
     // Test 6: Validation and error cases
-    test_task_validation_and_error_cases().await;
+    test_task_validation_and_error_cases();
     println!("✅ Validation and error cases test PASSED");
     
     // Test 7: Bulk operations
-    test_bulk_task_operations().await;
+    test_bulk_task_operations();
     println!("✅ Bulk operations test PASSED");
     
     println!("🎉 All task CRUD tests completed!");
