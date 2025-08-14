@@ -68,6 +68,7 @@ export interface CreateTaskRequest {
   parentId?: string;
   dueDate?: Date;
   notificationSettings?: TaskNotificationSettings;
+  tags?: Tag[];
 }
 
 export interface UpdateTaskRequest {

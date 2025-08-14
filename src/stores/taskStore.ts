@@ -69,6 +69,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         parentId: taskData.parentId,
         dueDate: taskData.dueDate,
         notificationSettings: taskData.notificationSettings,
+        tags: taskData.tags,
       };
 
       const newTask = await TaskService.createTask(createRequest);
