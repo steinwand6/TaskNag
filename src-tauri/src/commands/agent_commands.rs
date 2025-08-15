@@ -1,6 +1,8 @@
-use crate::services::AgentService;
+use crate::services::{AgentService, PersonalityManager};
+use crate::services::personality_manager::AIPersonality;
 use tauri::State;
 use serde_json::Value;
+use std::sync::{Arc, RwLock};
 
 #[tauri::command]
 pub async fn test_ollama_connection(
@@ -100,4 +102,33 @@ pub async fn chat_with_agent(
         .chat(&message, context)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_available_personalities(
+    personality_manager: State<'_, Arc<RwLock<PersonalityManager>>>,
+) -> Result<Vec<AIPersonality>, String> {
+    let manager = personality_manager.read().map_err(|e| e.to_string())?;
+    let personalities = manager.get_personalities()
+        .into_iter()
+        .cloned()
+        .collect();
+    Ok(personalities)
+}
+
+#[tauri::command]
+pub fn set_ai_personality(
+    personality_id: String,
+    personality_manager: State<'_, Arc<RwLock<PersonalityManager>>>,
+) -> Result<(), String> {
+    let mut manager = personality_manager.write().map_err(|e| e.to_string())?;
+    manager.set_current_personality(personality_id)
+}
+
+#[tauri::command]
+pub fn get_current_personality(
+    personality_manager: State<'_, Arc<RwLock<PersonalityManager>>>,
+) -> Result<Option<(String, String)>, String> {
+    let manager = personality_manager.read().map_err(|e| e.to_string())?;
+    Ok(manager.get_current_personality_info())
 }

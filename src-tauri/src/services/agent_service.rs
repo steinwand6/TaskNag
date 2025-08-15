@@ -288,11 +288,13 @@ impl AgentService {
     
     /// Chat with the agent
     pub async fn chat(&self, message: &str, context: Option<String>) -> Result<String, AgentError> {
-        let mut prompt = format!("あなたは親切なアシスタントです。日本語で自然に会話してください。\n\nユーザー: {}", message);
+        let mut base_prompt = format!("日本語で自然に会話してください。\n\nユーザー: {}", message);
         
         if let Some(ctx) = context {
-            prompt = format!("Context: {}\n\n{}", ctx, prompt);
+            base_prompt = format!("Context: {}\n\n{}", ctx, base_prompt);
         }
+        
+        let prompt = base_prompt;
         
         let options = GenerateOptions {
             temperature: Some(0.8),
