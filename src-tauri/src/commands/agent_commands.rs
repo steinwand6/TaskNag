@@ -1,5 +1,6 @@
 use crate::services::{AgentService, PersonalityManager};
 use crate::services::personality_manager::AIPersonality;
+use crate::services::agent_service::{AgentConfig, ModelPreference, ModelPerformanceTier};
 use tauri::State;
 use serde_json::Value;
 use std::sync::{Arc, RwLock};
@@ -26,6 +27,16 @@ pub async fn test_ollama_connection(
 pub async fn list_ollama_models(
     agent: State<'_, AgentService>,
 ) -> Result<Vec<String>, String> {
+    agent
+        .list_model_names()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_ollama_models_detailed(
+    agent: State<'_, AgentService>,
+) -> Result<Vec<crate::services::ollama_client::ModelInfo>, String> {
     agent
         .list_models()
         .await
@@ -194,6 +205,65 @@ pub async fn set_ai_personality(
     }
     
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_agent_config(
+    agent: State<'_, AgentService>,
+) -> Result<AgentConfig, String> {
+    Ok(agent.get_config().clone())
+}
+
+#[tauri::command]
+pub async fn update_agent_config(
+    _config: AgentConfig,
+    _agent: State<'_, AgentService>,
+) -> Result<(), String> {
+    // AgentServiceは参照なので、直接変更できません
+    // 代わりに個別の設定更新関数を使用
+    Err("Direct config update not supported. Use individual setting commands.".to_string())
+}
+
+#[tauri::command]
+pub fn get_model_preference(
+    model_name: String,
+    agent: State<'_, AgentService>,
+) -> Result<Option<ModelPreference>, String> {
+    Ok(agent.get_model_preference(&model_name).cloned())
+}
+
+#[tauri::command]
+pub async fn get_model_preferences_for_available_models(
+    agent: State<'_, AgentService>,
+) -> Result<std::collections::HashMap<String, ModelPreference>, String> {
+    // 利用可能なモデル一覧を取得
+    let models = agent.list_model_names().await.map_err(|e| e.to_string())?;
+    
+    // 各モデルの推奨設定を取得
+    let mut preferences = std::collections::HashMap::new();
+    for model in models {
+        if let Some(pref) = agent.get_model_preference(&model) {
+            preferences.insert(model, pref.clone());
+        } else {
+            // デフォルト設定を生成
+            let tier = if model.contains("8b") {
+                ModelPerformanceTier::Fast
+            } else if model.contains("12b") || model.contains("13b") {
+                ModelPerformanceTier::Quality
+            } else {
+                ModelPerformanceTier::Balanced
+            };
+            
+            preferences.insert(model.clone(), ModelPreference {
+                display_name: model.clone(),
+                description: "汎用モデル".to_string(),
+                recommended_for: vec!["一般的な用途".to_string()],
+                performance_tier: tier,
+            });
+        }
+    }
+    
+    Ok(preferences)
 }
 
 #[tauri::command]

@@ -72,7 +72,7 @@ pub struct GenerateResponse {
     pub eval_duration: Option<u64>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ModelInfo {
     pub name: String,
     pub modified_at: String,

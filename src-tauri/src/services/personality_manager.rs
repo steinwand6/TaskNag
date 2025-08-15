@@ -220,11 +220,7 @@ impl PersonalityManager {
     }
     
     pub fn get_current_personality_info(&self) -> Option<(String, String)> {
-        if let Some(personality) = self.get_current_personality() {
-            Some((personality.name.clone(), personality.description.clone()))
-        } else {
-            None
-        }
+        self.get_current_personality().map(|personality| (personality.name.clone(), personality.description.clone()))
     }
     
     /// デバッグ用：プロンプト拡張のテスト

@@ -194,26 +194,106 @@ pub struct AgentService {
     ollama: OllamaClient,
     prompt_manager: PromptManager,
     pub db: SqlitePool,
+    pub config: AgentConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConfig {
+    pub default_model: String,
+    pub base_url: String,
+    pub timeout_seconds: u64,
+    pub available_models: Vec<String>,
+    pub model_preferences: std::collections::HashMap<String, ModelPreference>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelPreference {
+    pub display_name: String,
+    pub description: String,
+    pub recommended_for: Vec<String>,
+    pub performance_tier: ModelPerformanceTier,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ModelPerformanceTier {
+    Fast,      // 高速だが品質は控えめ
+    Balanced,  // バランス型
+    Quality,   // 高品質だが時間がかかる
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        let mut model_preferences = std::collections::HashMap::new();
+        
+        // 一般的なモデルの推奨設定
+        model_preferences.insert(
+            "gemma3:12b".to_string(),
+            ModelPreference {
+                display_name: "Gemma3 12B".to_string(),
+                description: "高品質な日本語対応モデル、タスク分析に最適".to_string(),
+                recommended_for: vec!["タスク分析".to_string(), "プロジェクト計画".to_string()],
+                performance_tier: ModelPerformanceTier::Quality,
+            }
+        );
+        
+        model_preferences.insert(
+            "llama3:latest".to_string(),
+            ModelPreference {
+                display_name: "Llama3 Latest".to_string(),
+                description: "バランス型の汎用モデル".to_string(),
+                recommended_for: vec!["一般的なチャット".to_string(), "タスク作成".to_string()],
+                performance_tier: ModelPerformanceTier::Balanced,
+            }
+        );
+        
+        model_preferences.insert(
+            "llama3:8b".to_string(),
+            ModelPreference {
+                display_name: "Llama3 8B".to_string(),
+                description: "軽量で高速なモデル".to_string(),
+                recommended_for: vec!["簡単なタスク".to_string(), "クイックチャット".to_string()],
+                performance_tier: ModelPerformanceTier::Fast,
+            }
+        );
+        
+        Self {
+            default_model: "gemma3:12b".to_string(),
+            base_url: "http://localhost:11434".to_string(),
+            timeout_seconds: 60,
+            available_models: vec![],
+            model_preferences,
+        }
+    }
 }
 
 impl AgentService {
     pub fn new(db: SqlitePool) -> Self {
+        let config = AgentConfig::default();
         Self {
             ollama: OllamaClient::new(
-                "http://localhost:11434".to_string(),
-                "gemma3:12b".to_string(),
-                60  // タイムアウトも60秒に延長
+                config.base_url.clone(),
+                config.default_model.clone(),
+                config.timeout_seconds
             ),
             prompt_manager: PromptManager::new(),
             db,
+            config,
         }
     }
     
     pub fn with_custom_ollama(db: SqlitePool, base_url: String, model: String) -> Self {
+        let config = AgentConfig {
+            base_url: base_url.clone(),
+            default_model: model.clone(),
+            timeout_seconds: 30,
+            ..Default::default()
+        };
+        
         Self {
             ollama: OllamaClient::new(base_url, model, 30),
             prompt_manager: PromptManager::new(),
             db,
+            config,
         }
     }
     
@@ -222,8 +302,14 @@ impl AgentService {
         Ok(self.ollama.test_connection().await?)
     }
     
-    /// List available models
-    pub async fn list_models(&self) -> Result<Vec<String>, AgentError> {
+    /// List available models with detailed information
+    pub async fn list_models(&self) -> Result<Vec<crate::services::ollama_client::ModelInfo>, AgentError> {
+        let models = self.ollama.list_models().await?;
+        Ok(models)
+    }
+    
+    /// List available model names (simple list)
+    pub async fn list_model_names(&self) -> Result<Vec<String>, AgentError> {
         let models = self.ollama.list_models().await?;
         Ok(models.into_iter().map(|m| m.name).collect())
     }
@@ -265,13 +351,121 @@ impl AgentService {
         .await 
         {
             let saved_model = row.0;
+            self.config.default_model = saved_model.clone();
             self.ollama = OllamaClient::new(
-                self.ollama.base_url.clone(),
+                self.config.base_url.clone(),
                 saved_model,
-                self.ollama.timeout_seconds
+                self.config.timeout_seconds
             );
         }
         Ok(())
+    }
+    
+    /// Get agent configuration
+    pub fn get_config(&self) -> &AgentConfig {
+        &self.config
+    }
+    
+    /// Update agent configuration
+    pub async fn update_config(&mut self, new_config: AgentConfig) -> Result<(), AgentError> {
+        // Update Ollama client with new settings
+        self.ollama = OllamaClient::new(
+            new_config.base_url.clone(),
+            new_config.default_model.clone(),
+            new_config.timeout_seconds
+        );
+        
+        // Save default model to database
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('current_model', ?1, datetime('now'))
+            "#
+        )
+        .bind(&new_config.default_model)
+        .execute(&self.db)
+        .await?;
+        
+        // Save base URL to database
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('base_url', ?1, datetime('now'))
+            "#
+        )
+        .bind(&new_config.base_url)
+        .execute(&self.db)
+        .await?;
+        
+        // Save timeout to database
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('timeout_seconds', ?1, datetime('now'))
+            "#
+        )
+        .bind(new_config.timeout_seconds.to_string())
+        .execute(&self.db)
+        .await?;
+        
+        // Update in-memory config
+        self.config = new_config;
+        
+        Ok(())
+    }
+    
+    /// Load full configuration from database
+    pub async fn load_saved_config(&mut self) -> Result<(), AgentError> {
+        // Load saved model
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM agent_config WHERE key = 'current_model'"
+        )
+        .fetch_optional(&self.db)
+        .await 
+        {
+            self.config.default_model = row.0;
+        }
+        
+        // Load saved base URL
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM agent_config WHERE key = 'base_url'"
+        )
+        .fetch_optional(&self.db)
+        .await 
+        {
+            self.config.base_url = row.0;
+        }
+        
+        // Load saved timeout
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM agent_config WHERE key = 'timeout_seconds'"
+        )
+        .fetch_optional(&self.db)
+        .await 
+        {
+            if let Ok(timeout) = row.0.parse::<u64>() {
+                self.config.timeout_seconds = timeout;
+            }
+        }
+        
+        // Update Ollama client with loaded config
+        self.ollama = OllamaClient::new(
+            self.config.base_url.clone(),
+            self.config.default_model.clone(),
+            self.config.timeout_seconds
+        );
+        
+        Ok(())
+    }
+    
+    /// Get model preferences for a specific model
+    pub fn get_model_preference(&self, model_name: &str) -> Option<&ModelPreference> {
+        self.config.model_preferences.get(model_name)
+    }
+    
+    /// Add or update model preference
+    pub fn set_model_preference(&mut self, model_name: String, preference: ModelPreference) {
+        self.config.model_preferences.insert(model_name, preference);
     }
     
     /// Analyze a task description and provide suggestions
