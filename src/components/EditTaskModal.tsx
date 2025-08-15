@@ -1,7 +1,9 @@
 import React from 'react';
 import { Task, TaskStatus, TaskNotificationSettings, Tag } from '../types/Task';
+import { BrowserAction, BrowserActionSettings } from '../types/BrowserAction';
 import { NotificationSettings } from './NotificationSettings';
 import { TagDisplay } from './TagDisplay';
+import URLActionConfig from './URLActionConfig';
 import { useTaskStore } from '../stores/taskStore';
 import { DEFAULT_TASK_STATUS, STATUS_OPTIONS } from '../constants/taskStatus';
 import { LogService } from '../services/logService';
@@ -25,6 +27,9 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   const [showTagSelector, setShowTagSelector] = React.useState(false);
   const [newTagName, setNewTagName] = React.useState('');
   const [newTagColor, setNewTagColor] = React.useState('#3b82f6');
+  
+  // ブラウザアクション管理用状態
+  const [browserActions, setBrowserActions] = React.useState<BrowserAction[]>([]);
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
@@ -34,6 +39,10 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
       notificationType: 'none',
       level: 1,
     } as TaskNotificationSettings,
+    browserActions: {
+      enabled: false,
+      actions: [],
+    } as BrowserActionSettings,
   });
   
   // Initialize form data when task changes
@@ -48,8 +57,13 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
           notificationType: 'none',
           level: 1,
         },
+        browserActions: task.browserActions || {
+          enabled: false,
+          actions: [],
+        },
       });
       setSelectedTags(task.tags || []);
+      setBrowserActions(task.browserActions?.actions || []);
     }
   }, [task]);
   
@@ -72,6 +86,10 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
       status: formData.status,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
       notificationSettings: formData.notificationSettings,
+      browserActions: {
+        enabled: formData.browserActions.enabled,
+        actions: browserActions,
+      },
       tags: validTags,
     });
     
@@ -81,6 +99,24 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   const handleNotificationChange = (settings: TaskNotificationSettings) => {
     LogService.info('EditTaskModal: 通知設定が変更されました', JSON.stringify(settings));
     setFormData({ ...formData, notificationSettings: settings });
+  };
+  
+  const handleBrowserActionsChange = (actions: BrowserAction[]) => {
+    setBrowserActions(actions);
+    // ブラウザアクションが設定されている場合は自動的に有効にする
+    if (actions.length > 0 && !formData.browserActions.enabled) {
+      setFormData({ 
+        ...formData, 
+        browserActions: { ...formData.browserActions, enabled: true }
+      });
+    }
+  };
+  
+  const handleBrowserActionToggle = (enabled: boolean) => {
+    setFormData({ 
+      ...formData, 
+      browserActions: { ...formData.browserActions, enabled }
+    });
   };
   
   // タグ関連のハンドラー
@@ -295,6 +331,36 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
               hasDueDate={!!formData.dueDate}
             />
           </div>
+          
+          {/* ブラウザアクション設定セクション */}
+          {formData.notificationSettings.notificationType !== 'none' && (
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-700">ブラウザアクション</h3>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.browserActions.enabled}
+                    onChange={(e) => handleBrowserActionToggle(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-600">有効にする</span>
+                </label>
+              </div>
+              
+              <div className="text-sm text-gray-500 mb-3">
+                通知時に指定したWebページを自動で開きます
+              </div>
+              
+              {formData.browserActions.enabled && (
+                <URLActionConfig
+                  actions={browserActions}
+                  onChange={handleBrowserActionsChange}
+                  disabled={false}
+                />
+              )}
+            </div>
+          )}
           
           <div className="flex justify-end space-x-3 pt-4">
             <button

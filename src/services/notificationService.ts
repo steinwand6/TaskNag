@@ -1,4 +1,5 @@
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { LogService } from './logService';
 
 export interface NotificationPayload {
@@ -166,7 +167,6 @@ export class NotificationService {
   // 即座通知テスト（実際の通知設定を使用）
   static async testNotificationImmediate(): Promise<void> {
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
       await invoke('test_notification_immediate');
       LogService.info('即座通知テストを実行しました');
     } catch (error) {
@@ -177,7 +177,6 @@ export class NotificationService {
   // Windows通知送信
   static async sendWindowsNotification(title: string, body: string, level: number = 1): Promise<void> {
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
       await invoke('send_windows_notification', { title, body, level });
       LogService.info(`Windows通知を送信: ${title} - ${body} (Level ${level})`);
     } catch (error) {

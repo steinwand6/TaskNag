@@ -392,7 +392,7 @@ impl TaskService {
     pub async fn get_tasks_by_status(&self, status: &str) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
             FROM tasks
             WHERE status = ?1
             ORDER BY 

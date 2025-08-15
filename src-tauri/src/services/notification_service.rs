@@ -1,6 +1,6 @@
 use crate::database::Database;
 use crate::error::AppError;
-use crate::models::{Task, TaskNotification, BrowserAction};
+use crate::models::{Task, TaskNotification};
 use crate::services::browser_action_service::BrowserActionService;
 use chrono::{DateTime, Utc, Duration, Datelike, Timelike};
 use std::sync::Arc;
@@ -72,11 +72,11 @@ impl NotificationService {
         
         // ブラウザアクションが設定されている場合、実行
         if let Some(browser_actions_json) = &task.browser_actions {
-            match self.parse_browser_actions(browser_actions_json) {
-                Ok(browser_actions) => {
-                    if !browser_actions.is_empty() {
-                        log::info!("Executing {} browser actions for notification", browser_actions.len());
-                        match self.browser_action_service.execute_actions(&browser_actions).await {
+            match self.parse_browser_action_settings(browser_actions_json) {
+                Ok(browser_action_settings) => {
+                    if browser_action_settings.enabled && !browser_action_settings.actions.is_empty() {
+                        log::info!("Executing {} browser actions for notification", browser_action_settings.actions.len());
+                        match self.browser_action_service.execute_actions(&browser_action_settings.actions).await {
                             Ok(_) => {
                                 log::info!("Successfully executed browser actions for task: {}", task.id);
                             }
@@ -225,14 +225,18 @@ impl NotificationService {
         Ok(task)
     }
 
-    /// JSONからBrowserActionのリストをパース
-    fn parse_browser_actions(&self, json: &str) -> Result<Vec<BrowserAction>, AppError> {
+
+    /// JSONからBrowserActionSettingsをパース
+    fn parse_browser_action_settings(&self, json: &str) -> Result<crate::models::browser_action::BrowserActionSettings, AppError> {
         if json.trim().is_empty() {
-            return Ok(Vec::new());
+            return Ok(crate::models::browser_action::BrowserActionSettings {
+                enabled: false,
+                actions: Vec::new(),
+            });
         }
         
         serde_json::from_str(json)
-            .map_err(|e| AppError::ParseError(format!("Failed to parse browser actions: {}", e)))
+            .map_err(|e| AppError::ParseError(format!("Failed to parse browser action settings: {}", e)))
     }
 
     /// 通知サービスの可用性をチェック
@@ -282,16 +286,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_browser_actions_parsing() {
+    async fn test_browser_action_settings_parsing() {
         let db = Database::new_placeholder();
         let service = NotificationService::new(db);
 
-        // Valid JSON
-        let valid_json = r#"[{"id":"1","label":"Google","url":"https://google.com","enabled":true,"order":1,"createdAt":"2024-01-01T00:00:00Z"}]"#;
-        let result = service.parse_browser_actions(valid_json);
+        // Valid JSON for BrowserActionSettings
+        let valid_json = r#"{"enabled":true,"actions":[{"id":"1","label":"Google","url":"https://google.com","enabled":true,"order":1,"createdAt":"2024-01-01T00:00:00Z"}]}"#;
+        let result = service.parse_browser_action_settings(valid_json);
         match &result {
-            Ok(actions) => {
-                assert_eq!(actions.len(), 1);
+            Ok(settings) => {
+                assert_eq!(settings.enabled, true);
+                assert_eq!(settings.actions.len(), 1);
             },
             Err(e) => {
                 panic!("Expected valid JSON to parse correctly, but got error: {:?}", e);
@@ -300,13 +305,15 @@ mod tests {
 
         // Empty JSON
         let empty_json = "";
-        let result = service.parse_browser_actions(empty_json);
+        let result = service.parse_browser_action_settings(empty_json);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().len(), 0);
+        let settings = result.unwrap();
+        assert_eq!(settings.enabled, false);
+        assert_eq!(settings.actions.len(), 0);
 
         // Invalid JSON
         let invalid_json = "invalid json";
-        let result = service.parse_browser_actions(invalid_json);
+        let result = service.parse_browser_action_settings(invalid_json);
         assert!(result.is_err());
     }
 }

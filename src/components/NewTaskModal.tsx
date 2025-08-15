@@ -1,9 +1,11 @@
 import React from 'react';
 import { TaskStatus, TaskNotificationSettings, Tag } from '../types/Task';
+import { BrowserAction, BrowserActionSettings } from '../types/BrowserAction';
 import { useTaskStore } from '../stores/taskStore';
 import { DEFAULT_TASK_STATUS, STATUS_OPTIONS } from '../constants/taskStatus';
 import { NotificationSettings } from './NotificationSettings';
 import { TagDisplay } from './TagDisplay';
+import URLActionConfig from './URLActionConfig';
 
 interface NewTaskModalProps {
   isOpen: boolean;
@@ -20,6 +22,9 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
   const [newTagName, setNewTagName] = React.useState('');
   const [newTagColor, setNewTagColor] = React.useState('#3b82f6');
   
+  // ブラウザアクション管理用状態
+  const [browserActions, setBrowserActions] = React.useState<BrowserAction[]>([]);
+  
   const [formData, setFormData] = React.useState({
     title: '',
     description: '',
@@ -29,6 +34,10 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
       notificationType: 'none',
       level: 1,
     } as TaskNotificationSettings,
+    browserActions: {
+      enabled: false,
+      actions: [],
+    } as BrowserActionSettings,
   });
   
   // Load tags when component mounts
@@ -44,12 +53,19 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
       // 一時的なIDを持つタグを除外（実際のDBに存在するタグのみを保存）
       const validTags = selectedTags.filter(tag => !tag.id.startsWith('temp-'));
       
+      // ブラウザアクション設定を準備
+      const browserActionSettings: BrowserActionSettings = {
+        enabled: formData.browserActions.enabled && browserActions.length > 0,
+        actions: browserActions.filter(action => action.enabled)
+      };
+      
       await addTask({
         title: formData.title,
         description: formData.description || undefined,
         status: formData.status,
         dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
         notificationSettings: formData.notificationSettings,
+        browserActions: browserActionSettings,
         tags: validTags,
       });
       
@@ -62,8 +78,13 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
           notificationType: 'none',
           level: 1,
         },
+        browserActions: {
+          enabled: false,
+          actions: [],
+        },
       });
       setSelectedTags([]);
+      setBrowserActions([]);
       setShowTagSelector(false);
       setNewTagName('');
       setNewTagColor('#3b82f6');
@@ -75,6 +96,24 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
 
   const handleNotificationChange = (settings: TaskNotificationSettings) => {
     setFormData({ ...formData, notificationSettings: settings });
+  };
+  
+  const handleBrowserActionsChange = (actions: BrowserAction[]) => {
+    setBrowserActions(actions);
+    // ブラウザアクションが設定されている場合は自動的に有効にする
+    if (actions.length > 0 && !formData.browserActions.enabled) {
+      setFormData({ 
+        ...formData, 
+        browserActions: { ...formData.browserActions, enabled: true }
+      });
+    }
+  };
+  
+  const handleBrowserActionToggle = (enabled: boolean) => {
+    setFormData({ 
+      ...formData, 
+      browserActions: { ...formData.browserActions, enabled }
+    });
   };
   
   // タグ関連のハンドラー
@@ -288,6 +327,36 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, ini
               hasDueDate={!!formData.dueDate}
             />
           </div>
+          
+          {/* ブラウザアクション設定セクション */}
+          {formData.notificationSettings.notificationType !== 'none' && (
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-700">ブラウザアクション</h3>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.browserActions.enabled}
+                    onChange={(e) => handleBrowserActionToggle(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-600">有効にする</span>
+                </label>
+              </div>
+              
+              <div className="text-sm text-gray-500 mb-3">
+                通知時に指定したWebページを自動で開きます
+              </div>
+              
+              {formData.browserActions.enabled && (
+                <URLActionConfig
+                  actions={browserActions}
+                  onChange={handleBrowserActionsChange}
+                  disabled={false}
+                />
+              )}
+            </div>
+          )}
           
           <div className="flex justify-end space-x-3 pt-4">
             <button

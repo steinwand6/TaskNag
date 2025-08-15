@@ -18,4 +18,10 @@ pub mod task_tag_integration_tests;
 pub mod debug_database;
 #[cfg(test)]
 pub mod real_database_test;
+#[cfg(test)]
+pub mod browser_action_manual_test;
+#[cfg(test)]
+pub mod browser_action_task_integration_test;
+#[cfg(test)]
+pub mod database_schema_validation_test;
 // pub mod subtask_notification_tests;
