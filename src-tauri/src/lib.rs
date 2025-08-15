@@ -7,7 +7,7 @@ pub mod services;
 pub mod tests;
 
 use database::Database;
-use services::{TaskService, AgentService, PersonalityManager, BrowserActionService, NotificationService};
+use services::{TaskService, AgentService, BrowserActionService, NotificationService};
 use tauri::{
   AppHandle, Manager, WindowEvent, 
   tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
@@ -96,14 +96,15 @@ pub fn run() {
         // Initialize services
         let task_service = TaskService::new(db.clone());
         let agent_service = AgentService::new(db.pool.clone());
-        let personality_manager = std::sync::Arc::new(std::sync::RwLock::new(PersonalityManager::new()));
+        // PersonalityManagerを一時的に無効化
+        // let personality_manager = std::sync::Arc::new(std::sync::RwLock::new(PersonalityManager::new()));
         let browser_action_service = std::sync::Arc::new(BrowserActionService::new());
         let notification_service = NotificationService::with_browser_action_service(db.clone(), browser_action_service.clone());
         
         // Add services to app state
         handle.manage(task_service);
         handle.manage(agent_service);
-        handle.manage(personality_manager);
+        // handle.manage(personality_manager);
         handle.manage(browser_action_service);
         handle.manage(notification_service);
       });
@@ -161,9 +162,10 @@ pub fn run() {
       commands::agent_commands::create_project_plan,
       commands::agent_commands::parse_natural_language_task,
       commands::agent_commands::chat_with_agent,
-      commands::agent_commands::get_available_personalities,
-      commands::agent_commands::set_ai_personality,
-      commands::agent_commands::get_current_personality,
+      // PersonalityManager関連コマンドを一時的に無効化
+      // commands::agent_commands::get_available_personalities,
+      // commands::agent_commands::set_ai_personality,
+      // commands::agent_commands::get_current_personality,
       commands::browser_commands::validate_url_command,
       commands::browser_commands::test_browser_action_command,
       commands::browser_commands::execute_browser_action_command,

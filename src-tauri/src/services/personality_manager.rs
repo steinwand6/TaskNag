@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use sqlx::{Pool, Sqlite};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AIPersonality {
@@ -24,6 +25,7 @@ pub enum EmojiStyle {
 pub struct PersonalityManager {
     personalities: HashMap<String, AIPersonality>,
     current_personality: Option<String>,
+    db: Option<Pool<Sqlite>>,
 }
 
 impl Default for PersonalityManager {
@@ -34,6 +36,10 @@ impl Default for PersonalityManager {
 
 impl PersonalityManager {
     pub fn new() -> Self {
+        Self::new_with_db(None)
+    }
+    
+    pub fn new_with_db(db: Option<Pool<Sqlite>>) -> Self {
         let mut personalities = HashMap::new();
         
         // 1. 丁寧な秘書
@@ -135,6 +141,7 @@ impl PersonalityManager {
         Self {
             personalities,
             current_personality: Some("friendly_colleague".to_string()), // デフォルト
+            db,
         }
     }
     

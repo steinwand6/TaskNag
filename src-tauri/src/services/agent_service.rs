@@ -307,6 +307,27 @@ impl AgentService {
         Ok(OllamaClient::get_response_content(&response))
     }
     
+    /// Chat with custom prompt (for personality-enhanced prompts)  
+    pub async fn chat_with_personality(&self, message: &str, is_personality_enhanced: bool) -> Result<String, AgentError> {
+        let prompt = if is_personality_enhanced {
+            // 既に性格が適用されたプロンプト
+            message.to_string()
+        } else {
+            // 通常のプロンプト
+            format!("日本語で自然に会話してください。\n\n{}", message)
+        };
+        
+        let options = GenerateOptions {
+            temperature: Some(0.8),
+            num_predict: Some(1000),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&prompt, Some(options)).await?;
+        Ok(OllamaClient::get_response_content(&response))
+    }
+    
     /// Save conversation to database
     pub async fn save_conversation(&self, conversation: &AgentConversation) -> Result<(), AgentError> {
         let messages_json = serde_json::to_string(&conversation.messages)?;

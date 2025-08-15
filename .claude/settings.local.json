@@ -70,10 +70,15 @@
       "mcp__serena__find_file",
       "Bash(refreshenv)",
       "Bash(gh:*)",
-      "Bash(export:*)"
+      "Bash(export:*)",
+      "Bash(RUST_LOG=debug npm run tauri dev)",
+      "Bash(RUST_LOG=debug RUST_BACKTRACE=1 npm run tauri dev)"
     ],
     "deny": [],
     "ask": [],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\c\\Users\\stone\\Desktop\\projects"
+    ]
   }
 }
