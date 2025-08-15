@@ -278,7 +278,14 @@ impl Default for AgentConfig {
 
 impl AgentService {
     pub fn new(db: SqlitePool) -> Self {
+        log::info!("Initializing AgentService with enhanced context support");
         let config = AgentConfig::default();
+        
+        let enhanced_prompt_manager = EnhancedPromptManager::new(db.clone());
+        let context_service = ContextService::new(db.clone());
+        
+        log::info!("AgentService components initialized successfully");
+        
         Self {
             ollama: OllamaClient::new(
                 config.base_url.clone(),
@@ -286,8 +293,8 @@ impl AgentService {
                 config.timeout_seconds
             ),
             prompt_manager: PromptManager::new(),
-            enhanced_prompt_manager: EnhancedPromptManager::new(db.clone()),
-            context_service: ContextService::new(db.clone()),
+            enhanced_prompt_manager,
+            context_service,
             db,
             config,
         }
@@ -590,7 +597,12 @@ impl AgentService {
     
     /// Chat with context-aware prompt for task consultation
     pub async fn chat_with_task_consultation(&self, user_message: &str) -> Result<String, AgentError> {
-        let generated_prompt = self.enhanced_prompt_manager.generate_prompt("task_consultation").await?;
+        log::info!("Starting task consultation with context awareness");
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt("task_consultation").await
+            .map_err(|e| {
+                log::error!("Failed to generate task consultation prompt: {}", e);
+                e
+            })?;
         
         let full_prompt = format!(
             "{}\n\n## ユーザーの相談\n{}\n\n上記の状況を踏まえて、親身になってアドバイスしてください。",
@@ -605,7 +617,13 @@ impl AgentService {
             top_p: None,
         };
         
-        let response = self.ollama.generate(&full_prompt, Some(options)).await?;
+        let response = self.ollama.generate(&full_prompt, Some(options)).await
+            .map_err(|e| {
+                log::error!("Ollama request failed for task consultation: {}", e);
+                e
+            })?;
+        
+        log::info!("Task consultation completed successfully");
         Ok(OllamaClient::get_response_content(&response))
     }
     

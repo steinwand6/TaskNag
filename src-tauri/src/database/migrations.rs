@@ -209,7 +209,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
     .await
     .ok(); // Ignore error if column already exists
     
-    // Add browser_actions column to tasks table if it doesn't exist
+    // Always ensure browser_actions column exists
     sqlx::query(
         r#"
         ALTER TABLE tasks ADD COLUMN browser_actions TEXT DEFAULT NULL

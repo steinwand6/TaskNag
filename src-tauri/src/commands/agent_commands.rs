@@ -1,4 +1,4 @@
-use crate::services::{AgentService, PersonalityManager};
+use crate::services::{AgentService, PersonalityManager, ContextService};
 use crate::services::personality_manager::AIPersonality;
 use crate::services::agent_service::{AgentConfig, ModelPreference, ModelPerformanceTier};
 use tauri::State;
@@ -135,10 +135,37 @@ pub async fn chat_with_agent(
     message: String,
     context: Option<String>,
     agent: State<'_, AgentService>,
+    context_service: State<'_, ContextService>,
     personality_manager: State<'_, Arc<RwLock<PersonalityManager>>>,
 ) -> Result<String, String> {
+    // 自動的にコンテキストを収集
+    let auto_context = match context_service.collect_basic_context().await {
+        Ok(context_data) => {
+            let mut context_info = Vec::new();
+            for data in context_data {
+                context_info.push(format!("{}:", data.context_type));
+                for (key, value) in &data.data {
+                    context_info.push(format!("  {}: {}", key, value));
+                }
+            }
+            Some(context_info.join("\n"))
+        }
+        Err(e) => {
+            log::warn!("Failed to collect auto context: {}", e);
+            None
+        }
+    };
+    
+    // 手動コンテキストと自動コンテキストを結合
+    let combined_context = match (context, auto_context) {
+        (Some(manual), Some(auto)) => Some(format!("{}\n\n{}", auto, manual)),
+        (Some(manual), None) => Some(manual),
+        (None, Some(auto)) => Some(auto),
+        (None, None) => None,
+    };
+    
     // 基本プロンプトを構築
-    let base_prompt = if let Some(ctx) = context {
+    let base_prompt = if let Some(ctx) = combined_context {
         format!("Context: {}\n\nユーザー: {}", ctx, message)
     } else {
         format!("ユーザー: {}", message)
