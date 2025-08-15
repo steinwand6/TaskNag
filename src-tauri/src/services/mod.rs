@@ -7,6 +7,7 @@ pub mod url_validator;
 pub mod browser_action_service;
 pub mod notification_service;
 pub mod context_service;
+pub mod prompt_manager;
 
 pub use task_service::TaskService;
 pub use tag_service::TagService;

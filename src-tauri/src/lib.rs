@@ -190,6 +190,13 @@ pub fn run() {
       commands::context_commands::get_basic_context,
       commands::context_commands::get_context_for_scope,
       commands::context_commands::get_context_as_prompt_variables,
+      commands::prompt_commands::get_prompt_templates,
+      commands::prompt_commands::get_prompt_template,
+      commands::prompt_commands::generate_prompt,
+      commands::prompt_commands::generate_task_consultation_prompt,
+      commands::prompt_commands::generate_planning_prompt,
+      commands::prompt_commands::generate_motivation_prompt,
+      commands::prompt_commands::get_prompt_categories,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
