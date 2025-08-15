@@ -1,4 +1,6 @@
 use crate::services::ollama_client::{OllamaClient, OllamaError, GenerateOptions};
+use crate::services::context_service::{ContextService, ContextError};
+use crate::services::prompt_manager::{EnhancedPromptManager, PromptError, GeneratedPrompt};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use thiserror::Error;
@@ -20,6 +22,12 @@ pub enum AgentError {
     
     #[error("Invalid prompt: {0}")]
     InvalidPrompt(String),
+    
+    #[error("Context error: {0}")]
+    ContextError(#[from] ContextError),
+    
+    #[error("Prompt error: {0}")]
+    PromptError(#[from] PromptError),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,6 +201,8 @@ impl PromptManager {
 pub struct AgentService {
     ollama: OllamaClient,
     prompt_manager: PromptManager,
+    enhanced_prompt_manager: EnhancedPromptManager,
+    context_service: ContextService,
     pub db: SqlitePool,
     pub config: AgentConfig,
 }
@@ -276,6 +286,8 @@ impl AgentService {
                 config.timeout_seconds
             ),
             prompt_manager: PromptManager::new(),
+            enhanced_prompt_manager: EnhancedPromptManager::new(db.clone()),
+            context_service: ContextService::new(db.clone()),
             db,
             config,
         }
@@ -292,6 +304,8 @@ impl AgentService {
         Self {
             ollama: OllamaClient::new(base_url, model, 30),
             prompt_manager: PromptManager::new(),
+            enhanced_prompt_manager: EnhancedPromptManager::new(db.clone()),
+            context_service: ContextService::new(db.clone()),
             db,
             config,
         }
@@ -568,6 +582,110 @@ impl AgentService {
         Ok(OllamaClient::get_response_content(&response))
     }
     
+    /// Generate context-aware prompt using EnhancedPromptManager
+    pub async fn generate_context_aware_prompt(&self, template_id: &str) -> Result<GeneratedPrompt, AgentError> {
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt(template_id).await?;
+        Ok(generated_prompt)
+    }
+    
+    /// Chat with context-aware prompt for task consultation
+    pub async fn chat_with_task_consultation(&self, user_message: &str) -> Result<String, AgentError> {
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt("task_consultation").await?;
+        
+        let full_prompt = format!(
+            "{}\n\n## ユーザーの相談\n{}\n\n上記の状況を踏まえて、親身になってアドバイスしてください。",
+            generated_prompt.final_prompt,
+            user_message
+        );
+        
+        let options = GenerateOptions {
+            temperature: Some(0.7),
+            num_predict: Some(1500),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&full_prompt, Some(options)).await?;
+        Ok(OllamaClient::get_response_content(&response))
+    }
+    
+    /// Chat with context-aware prompt for planning assistance
+    pub async fn chat_with_planning_assistance(&self, user_message: &str) -> Result<String, AgentError> {
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt("planning_assistant").await?;
+        
+        let full_prompt = format!(
+            "{}\n\n## 計画したい内容\n{}\n\n効率的で実現可能な計画を一緒に立てましょう。",
+            generated_prompt.final_prompt,
+            user_message
+        );
+        
+        let options = GenerateOptions {
+            temperature: Some(0.6),
+            num_predict: Some(2000),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&full_prompt, Some(options)).await?;
+        Ok(OllamaClient::get_response_content(&response))
+    }
+    
+    /// Generate motivation boost message
+    pub async fn generate_motivation_boost(&self) -> Result<String, AgentError> {
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt("motivation_boost").await?;
+        
+        let options = GenerateOptions {
+            temperature: Some(0.8),
+            num_predict: Some(800),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&generated_prompt.final_prompt, Some(options)).await?;
+        Ok(OllamaClient::get_response_content(&response))
+    }
+    
+    /// Get current context information
+    pub async fn get_current_context(&self) -> Result<Vec<crate::services::context_service::ContextData>, AgentError> {
+        let context_data = self.context_service.collect_basic_context().await?;
+        Ok(context_data)
+    }
+    
+    /// Enhanced task analysis with context awareness
+    pub async fn analyze_task_with_context(&self, description: &str) -> Result<TaskAnalysis, AgentError> {
+        // 基本的なコンテキストを取得
+        let context_data = self.context_service.collect_basic_context().await?;
+        
+        // コンテキスト情報を文字列として構築
+        let mut context_info = String::new();
+        for data in context_data {
+            context_info.push_str(&format!("## {}\n", data.context_type));
+            for (key, value) in data.data {
+                context_info.push_str(&format!("- {}: {}\n", key, value));
+            }
+            context_info.push('\n');
+        }
+        
+        let mut vars = std::collections::HashMap::new();
+        vars.insert("task_description".to_string(), description.to_string());
+        vars.insert("context_info".to_string(), context_info);
+        
+        let prompt = self.prompt_manager.build_prompt("task_analysis", &vars)?;
+        
+        let options = GenerateOptions {
+            temperature: Some(0.4),
+            num_predict: Some(2000),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&prompt, Some(options)).await?;
+        let json_response = OllamaClient::get_response_content(&response);
+        
+        let analysis: TaskAnalysis = serde_json::from_str(&json_response)?;
+        Ok(analysis)
+    }
+    
     /// Save conversation to database
     pub async fn save_conversation(&self, conversation: &AgentConversation) -> Result<(), AgentError> {
         let messages_json = serde_json::to_string(&conversation.messages)?;
@@ -696,5 +814,55 @@ mod tests {
         );
         
         assert_eq!(client.get_model(), "test-model");
+    }
+    
+    #[tokio::test]
+    async fn test_enhanced_agent_service_integration() {
+        // テスト用のインメモリデータベース
+        let db = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+        
+        // テーブル作成
+        sqlx::query(r#"
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                description TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                priority TEXT NOT NULL DEFAULT 'medium',
+                due_date TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                parent_id INTEGER,
+                project_id TEXT,
+                estimated_time INTEGER,
+                actual_time INTEGER,
+                difficulty INTEGER DEFAULT 1,
+                progress INTEGER DEFAULT 0,
+                notification_settings TEXT,
+                FOREIGN KEY (parent_id) REFERENCES tasks (id)
+            )
+        "#)
+        .execute(&db)
+        .await
+        .unwrap();
+        
+        // AgentServiceインスタンス作成
+        let agent_service = AgentService::new(db.clone());
+        
+        // コンテキスト取得テスト
+        let context_result = agent_service.get_current_context().await;
+        assert!(context_result.is_ok());
+        let context_data = context_result.unwrap();
+        assert!(!context_data.is_empty());
+        
+        // プロンプト生成テスト
+        let prompt_result = agent_service.generate_context_aware_prompt("task_consultation").await;
+        assert!(prompt_result.is_ok());
+        let generated_prompt = prompt_result.unwrap();
+        assert_eq!(generated_prompt.template_id, "task_consultation");
+        assert!(!generated_prompt.final_prompt.is_empty());
+        
+        // 統合が正しく動作していることを確認
+        assert!(generated_prompt.final_prompt.contains("TaskNagAI"));
     }
 }

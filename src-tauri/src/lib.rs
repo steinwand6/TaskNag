@@ -197,6 +197,15 @@ pub fn run() {
       commands::prompt_commands::generate_planning_prompt,
       commands::prompt_commands::generate_motivation_prompt,
       commands::prompt_commands::get_prompt_categories,
+      commands::enhanced_agent_commands::chat_with_task_consultation,
+      commands::enhanced_agent_commands::chat_with_planning_assistance,
+      commands::enhanced_agent_commands::generate_motivation_boost,
+      commands::enhanced_agent_commands::get_current_context,
+      commands::enhanced_agent_commands::generate_context_aware_prompt,
+      commands::enhanced_agent_commands::analyze_task_with_context,
+      commands::enhanced_agent_commands::get_task_consultation_prompt,
+      commands::enhanced_agent_commands::get_planning_prompt,
+      commands::enhanced_agent_commands::get_motivation_prompt,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
