@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-// import { PersonalitySelector } from './PersonalitySelector'; // 一時無効化
+import { PersonalitySelector } from './PersonalitySelector';
 import { LogService } from '../services/logService';
 
 interface AISettingsProps {
@@ -149,14 +149,14 @@ export const AISettings: React.FC<AISettingsProps> = ({ isOpen, onClose }) => {
               )}
             </div>
 
-            {/* AI性格設定 - 一時無効化 */}
-            {/* <PersonalitySelector 
+            {/* AI性格設定 */}
+            <PersonalitySelector 
               onPersonalityChange={(personality) => {
                 if (personality) {
                   LogService.info('AISettings', `性格変更: ${personality.name}`);
                 }
               }}
-            /> */}
+            />
 
             {/* 使い方ガイド */}
             <div className="bg-blue-50 rounded-lg p-4">
