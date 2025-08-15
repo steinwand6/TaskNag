@@ -6,6 +6,7 @@ pub mod personality_manager;
 pub mod url_validator;
 pub mod browser_action_service;
 pub mod notification_service;
+pub mod context_service;
 
 pub use task_service::TaskService;
 pub use tag_service::TagService;
@@ -15,3 +16,4 @@ pub use personality_manager::PersonalityManager;
 pub use url_validator::URLValidator;
 pub use browser_action_service::BrowserActionService;
 pub use notification_service::NotificationService;
+pub use context_service::ContextService;

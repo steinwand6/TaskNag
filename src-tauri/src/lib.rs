@@ -7,7 +7,7 @@ pub mod services;
 pub mod tests;
 
 use database::Database;
-use services::{TaskService, AgentService, PersonalityManager, BrowserActionService, NotificationService};
+use services::{TaskService, AgentService, PersonalityManager, BrowserActionService, NotificationService, ContextService};
 use tauri::{
   AppHandle, Manager, WindowEvent, 
   tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
@@ -96,6 +96,7 @@ pub fn run() {
         // Initialize services
         let task_service = TaskService::new(db.clone());
         let mut agent_service = AgentService::new(db.pool.clone());
+        let context_service = ContextService::new(db.pool.clone());
         
         // Load saved configuration if exists
         agent_service.load_saved_config().await.ok();
@@ -109,6 +110,7 @@ pub fn run() {
         // Add services to app state
         handle.manage(task_service);
         handle.manage(agent_service);
+        handle.manage(context_service);
         handle.manage(personality_manager);
         handle.manage(browser_action_service);
         handle.manage(notification_service);
@@ -183,6 +185,11 @@ pub fn run() {
       commands::browser_commands::test_url_command,
       commands::browser_commands::get_url_suggestions_command,
       commands::browser_commands::get_url_preview_command,
+      commands::context_commands::get_temporal_context,
+      commands::context_commands::get_task_context,
+      commands::context_commands::get_basic_context,
+      commands::context_commands::get_context_for_scope,
+      commands::context_commands::get_context_as_prompt_variables,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
