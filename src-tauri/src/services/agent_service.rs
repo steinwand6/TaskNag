@@ -193,7 +193,7 @@ impl PromptManager {
 pub struct AgentService {
     ollama: OllamaClient,
     prompt_manager: PromptManager,
-    db: SqlitePool,
+    pub db: SqlitePool,
 }
 
 impl AgentService {
@@ -226,6 +226,52 @@ impl AgentService {
     pub async fn list_models(&self) -> Result<Vec<String>, AgentError> {
         let models = self.ollama.list_models().await?;
         Ok(models.into_iter().map(|m| m.name).collect())
+    }
+    
+    /// Get current model name
+    pub fn get_current_model(&self) -> String {
+        self.ollama.get_model().clone()
+    }
+    
+    /// Set model (for dynamic model changing) and save to database
+    pub async fn set_model(&mut self, model: String) -> Result<(), AgentError> {
+        // Update the client with new model
+        self.ollama = OllamaClient::new(
+            self.ollama.base_url.clone(),
+            model.clone(),
+            self.ollama.timeout_seconds
+        );
+        
+        // Save to database
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('current_model', ?1, datetime('now'))
+            "#
+        )
+        .bind(&model)
+        .execute(&self.db)
+        .await?;
+        
+        Ok(())
+    }
+    
+    /// Load model from database
+    pub async fn load_saved_model(&mut self) -> Result<(), AgentError> {
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM agent_config WHERE key = 'current_model'"
+        )
+        .fetch_optional(&self.db)
+        .await 
+        {
+            let saved_model = row.0;
+            self.ollama = OllamaClient::new(
+                self.ollama.base_url.clone(),
+                saved_model,
+                self.ollama.timeout_seconds
+            );
+        }
+        Ok(())
     }
     
     /// Analyze a task description and provide suggestions
@@ -395,5 +441,66 @@ mod tests {
         
         let prompt = manager.build_prompt("task_analysis", &vars).unwrap();
         assert!(prompt.contains("Test task"));
+    }
+    
+    #[tokio::test]
+    async fn test_model_management() {
+        // テスト用のインメモリデータベース
+        let db = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+        
+        // テスト用マイグレーション（agent_configテーブル）
+        sqlx::query(
+            r#"
+            CREATE TABLE agent_config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            "#
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+        
+        // AgentServiceインスタンス作成
+        let mut agent_service = AgentService::new(db.clone());
+        
+        // デフォルトモデル確認
+        let initial_model = agent_service.get_current_model();
+        assert_eq!(initial_model, "gemma3:12b");
+        
+        // モデル変更とデータベース保存
+        let new_model = "llama3:latest".to_string();
+        agent_service.set_model(new_model.clone()).await.unwrap();
+        
+        // モデルが変更されたことを確認
+        assert_eq!(agent_service.get_current_model(), new_model);
+        
+        // データベースに保存されたことを確認
+        let saved_model: (String,) = sqlx::query_as(
+            "SELECT value FROM agent_config WHERE key = 'current_model'"
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(saved_model.0, new_model);
+        
+        // 新しいAgentServiceインスタンスで保存されたモデルを読み込み
+        let mut new_agent_service = AgentService::new(db.clone());
+        new_agent_service.load_saved_model().await.unwrap();
+        
+        // 読み込まれたモデルが正しいことを確認
+        assert_eq!(new_agent_service.get_current_model(), new_model);
+    }
+    
+    #[test]
+    fn test_ollama_client_model_getter() {
+        let client = OllamaClient::new(
+            "http://localhost:11434".to_string(),
+            "test-model".to_string(),
+            30
+        );
+        
+        assert_eq!(client.get_model(), "test-model");
     }
 }

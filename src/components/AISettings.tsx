@@ -12,6 +12,9 @@ export const AISettings: React.FC<AISettingsProps> = ({ isOpen, onClose }) => {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'testing'>('disconnected');
   const [models, setModels] = useState<string[]>([]);
+  const [currentModel, setCurrentModel] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [isChangingModel, setIsChangingModel] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Ollama接続テスト
@@ -25,10 +28,15 @@ export const AISettings: React.FC<AISettingsProps> = ({ isOpen, onClose }) => {
       
       if (isConnected) {
         setConnectionStatus('connected');
-        // 接続成功したらモデル一覧を取得
-        const modelList = await invoke<string[]>('list_ollama_models');
+        // 接続成功したらモデル一覧と現在のモデルを取得
+        const [modelList, current] = await Promise.all([
+          invoke<string[]>('list_ollama_models'),
+          invoke<string>('get_current_model')
+        ]);
         setModels(modelList);
-        LogService.info('AISettings', `Ollama接続成功: ${modelList.length}個のモデル検出`);
+        setCurrentModel(current);
+        setSelectedModel(current); // 現在のモデルを選択状態として設定
+        LogService.info('AISettings', `Ollama接続成功: ${modelList.length}個のモデル検出, 使用中: ${current}`);
       } else {
         setConnectionStatus('disconnected');
         setError('Ollamaサービスに接続できません');
@@ -40,6 +48,31 @@ export const AISettings: React.FC<AISettingsProps> = ({ isOpen, onClose }) => {
       LogService.error('AISettings', `Ollama接続エラー: ${errorMessage}`);
     } finally {
       setIsTestingConnection(false);
+    }
+  };
+
+  // モデル変更
+  const changeModel = async (newModel: string) => {
+    if (newModel === currentModel) return; // 同じモデルなら何もしない
+    
+    try {
+      setIsChangingModel(true);
+      setError(null);
+      
+      await invoke('set_current_model', { model: newModel });
+      setSelectedModel(newModel);
+      LogService.info('AISettings', `モデル変更: ${currentModel} → ${newModel} (次回起動時に反映)`);
+      
+      // 成功メッセージを表示（エラー状態を使って表示、後でUIで色を変える）
+      setError(`SUCCESS:モデルを「${newModel}」に設定しました。アプリケーション再起動後に反映されます。`);
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`モデル変更に失敗しました: ${errorMessage}`);
+      LogService.error('AISettings', `モデル変更エラー: ${errorMessage}`);
+      setSelectedModel(currentModel); // 失敗時は元に戻す
+    } finally {
+      setIsChangingModel(false);
     }
   };
 
@@ -124,27 +157,70 @@ export const AISettings: React.FC<AISettingsProps> = ({ isOpen, onClose }) => {
               </div>
 
               {error && (
-                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                  <p className="text-sm text-red-600">{error}</p>
-                  <p className="text-xs text-red-500 mt-1">
-                    Ollamaが起動していることを確認してください
+                <div className={`mt-3 p-3 rounded-md ${
+                  error.startsWith('SUCCESS:')
+                    ? 'bg-green-50 border border-green-200'
+                    : 'bg-red-50 border border-red-200'
+                }`}>
+                  <p className={`text-sm ${
+                    error.startsWith('SUCCESS:')
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  }`}>
+                    {error.startsWith('SUCCESS:') ? error.substring(8) : error}
                   </p>
+                  {!error.startsWith('SUCCESS:') && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Ollamaが起動していることを確認してください
+                    </p>
+                  )}
                 </div>
               )}
 
               {connectionStatus === 'connected' && models.length > 0 && (
                 <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
-                  <p className="text-sm font-medium text-green-800 mb-2">利用可能なモデル:</p>
+                  <p className="text-sm font-medium text-green-800 mb-2">利用可能なモデル (クリックで変更):</p>
                   <div className="flex flex-wrap gap-2">
                     {models.map((model) => (
-                      <span
+                      <button
                         key={model}
-                        className="px-2 py-1 bg-white border border-green-300 rounded-md text-xs text-green-700"
+                        onClick={() => changeModel(model)}
+                        disabled={isChangingModel}
+                        className={`px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                          selectedModel === model
+                            ? 'bg-blue-600 text-white border-2 border-blue-700'
+                            : model === currentModel
+                            ? 'bg-green-600 text-white border-2 border-green-700'
+                            : 'bg-white text-green-700 border border-green-300 hover:bg-green-100'
+                        } ${isChangingModel ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                        title={
+                          selectedModel === model
+                            ? '次回起動時に適用されます'
+                            : model === currentModel
+                            ? '現在使用中'
+                            : 'クリックして選択'
+                        }
                       >
                         {model}
-                      </span>
+                        {selectedModel === model && selectedModel !== currentModel && (
+                          <span className="ml-1">⏱</span>
+                        )}
+                        {model === currentModel && (
+                          <span className="ml-1">✓</span>
+                        )}
+                      </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* 現在使用中モデル表示 */}
+              {connectionStatus === 'connected' && currentModel && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm font-medium text-blue-800 mb-1">現在使用中:</p>
+                  <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-sm font-medium">
+                    {currentModel}
+                  </span>
                 </div>
               )}
             </div>

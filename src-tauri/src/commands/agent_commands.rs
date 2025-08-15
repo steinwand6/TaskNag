@@ -33,6 +33,33 @@ pub async fn list_ollama_models(
 }
 
 #[tauri::command]
+pub fn get_current_model(
+    agent: State<'_, AgentService>,
+) -> Result<String, String> {
+    Ok(agent.get_current_model())
+}
+
+#[tauri::command]
+pub async fn set_current_model(
+    model: String,
+    agent: State<'_, AgentService>,
+) -> Result<(), String> {
+    // 設定をデータベースに保存（実際のモデル変更は次回起動時に反映）
+    sqlx::query(
+        r#"
+        INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+        VALUES ('current_model', ?1, datetime('now'))
+        "#
+    )
+    .bind(&model)
+    .execute(&agent.db)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn analyze_task_with_ai(
     description: String,
     agent: State<'_, AgentService>,
@@ -132,12 +159,41 @@ pub fn get_available_personalities(
 }
 
 #[tauri::command]
-pub fn set_ai_personality(
+pub async fn set_ai_personality(
     personality_id: String,
     personality_manager: State<'_, Arc<RwLock<PersonalityManager>>>,
 ) -> Result<(), String> {
-    let mut manager = personality_manager.write().map_err(|e| e.to_string())?;
-    manager.set_current_personality(personality_id)
+    // ロックを取得して即座にクローンを作成
+    let db = {
+        let manager = personality_manager.read().map_err(|e| e.to_string())?;
+        manager.db.clone()
+    };
+    
+    // データベースへの保存
+    if let Some(db) = db {
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('current_personality', ?1, datetime('now'))
+            "#
+        )
+        .bind(&personality_id)
+        .execute(&db)
+        .await
+        .map_err(|e| format!("Failed to save personality to database: {}", e))?;
+    }
+    
+    // メモリ内の状態を更新（データベース処理は既に完了しているので同期的に処理）
+    {
+        let mut manager = personality_manager.write().map_err(|e| e.to_string())?;
+        // PersonalityManagerの既存メソッドを使用（データベース処理はスキップ）
+        if manager.get_personality(&personality_id).is_none() {
+            return Err(format!("Personality '{}' not found", personality_id));
+        }
+        manager.set_current_personality_memory_only(personality_id)?;
+    }
+    
+    Ok(())
 }
 
 #[tauri::command]

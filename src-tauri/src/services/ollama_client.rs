@@ -23,10 +23,10 @@ pub enum OllamaError {
 
 #[derive(Debug, Clone)]
 pub struct OllamaClient {
-    base_url: String,
+    pub base_url: String,
     client: Client,
     default_model: String,
-    timeout_seconds: u64,
+    pub timeout_seconds: u64,
 }
 
 #[derive(Serialize, Debug)]
@@ -107,6 +107,11 @@ impl OllamaClient {
             default_model,
             timeout_seconds,
         }
+    }
+    
+    /// Get current default model
+    pub fn get_model(&self) -> &String {
+        &self.default_model
     }
     
     /// Test connection to Ollama server

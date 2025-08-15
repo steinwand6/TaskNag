@@ -25,7 +25,7 @@ pub enum EmojiStyle {
 pub struct PersonalityManager {
     personalities: HashMap<String, AIPersonality>,
     current_personality: Option<String>,
-    db: Option<Pool<Sqlite>>,
+    pub db: Option<Pool<Sqlite>>,
 }
 
 impl Default for PersonalityManager {
@@ -153,13 +153,45 @@ impl PersonalityManager {
         self.personalities.get(id)
     }
     
-    pub fn set_current_personality(&mut self, id: String) -> Result<(), String> {
-        if self.personalities.contains_key(&id) {
-            self.current_personality = Some(id);
-            Ok(())
-        } else {
-            Err(format!("Personality '{}' not found", id))
+    pub async fn set_current_personality(&mut self, id: String) -> Result<(), String> {
+        if !self.personalities.contains_key(&id) {
+            return Err(format!("Personality '{}' not found", id));
         }
+        
+        self.current_personality = Some(id.clone());
+        
+        // データベースに保存
+        if let Some(db) = &self.db {
+            sqlx::query(
+                r#"
+                INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+                VALUES ('current_personality', ?1, datetime('now'))
+                "#
+            )
+            .bind(&id)
+            .execute(db)
+            .await
+            .map_err(|e| format!("Failed to save personality to database: {}", e))?;
+        }
+        
+        Ok(())
+    }
+    
+    pub async fn load_saved_personality(&mut self) -> Result<(), String> {
+        if let Some(db) = &self.db {
+            if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+                "SELECT value FROM agent_config WHERE key = 'current_personality'"
+            )
+            .fetch_optional(db)
+            .await 
+            {
+                let saved_personality = row.0;
+                if self.personalities.contains_key(&saved_personality) {
+                    self.current_personality = Some(saved_personality);
+                }
+            }
+        }
+        Ok(())
     }
     
     pub fn get_current_personality(&self) -> Option<&AIPersonality> {
@@ -167,6 +199,15 @@ impl PersonalityManager {
             self.personalities.get(id)
         } else {
             None
+        }
+    }
+    
+    pub fn set_current_personality_memory_only(&mut self, id: String) -> Result<(), String> {
+        if self.personalities.contains_key(&id) {
+            self.current_personality = Some(id);
+            Ok(())
+        } else {
+            Err(format!("Personality '{}' not found", id))
         }
     }
     
@@ -195,7 +236,9 @@ impl PersonalityManager {
         
         // 全性格をテスト
         for personality_id in ["polite_secretary", "friendly_colleague", "enthusiastic_coach", "caring_childhood_friend"] {
-            manager.set_current_personality(personality_id.to_string()).unwrap();
+            tauri::async_runtime::block_on(async {
+                manager.set_current_personality(personality_id.to_string()).await.unwrap();
+            });
             let enhanced = manager.enhance_prompt(test_message);
             
             if let Some(current) = manager.get_current_personality() {
@@ -233,7 +276,9 @@ mod tests {
     #[test]
     fn test_personality_switching() {
         let mut manager = PersonalityManager::new();
-        assert!(manager.set_current_personality("polite_secretary".to_string()).is_ok());
+        tauri::async_runtime::block_on(async {
+            assert!(manager.set_current_personality("polite_secretary".to_string()).await.is_ok());
+        });
         
         let enhanced = manager.enhance_prompt("こんにちは");
         assert!(enhanced.contains("丁寧で礼儀正しい秘書"));
@@ -249,7 +294,9 @@ mod tests {
         let personalities = ["polite_secretary", "friendly_colleague", "enthusiastic_coach", "caring_childhood_friend"];
         
         for personality_id in personalities {
-            assert!(manager.set_current_personality(personality_id.to_string()).is_ok());
+            tauri::async_runtime::block_on(async {
+                assert!(manager.set_current_personality(personality_id.to_string()).await.is_ok());
+            });
             let enhanced = manager.enhance_prompt("テストメッセージ");
             assert!(enhanced.len() > "テストメッセージ".len());
             

@@ -95,8 +95,14 @@ pub fn run() {
         
         // Initialize services
         let task_service = TaskService::new(db.clone());
-        let agent_service = AgentService::new(db.pool.clone());
-        let personality_manager = std::sync::Arc::new(std::sync::RwLock::new(PersonalityManager::new_with_db(Some(db.pool.clone()))));
+        let mut agent_service = AgentService::new(db.pool.clone());
+        
+        // Load saved model if exists
+        agent_service.load_saved_model().await.ok();
+        
+        let mut personality_manager_instance = PersonalityManager::new_with_db(Some(db.pool.clone()));
+        personality_manager_instance.load_saved_personality().await.ok();
+        let personality_manager = std::sync::Arc::new(std::sync::RwLock::new(personality_manager_instance));
         let browser_action_service = std::sync::Arc::new(BrowserActionService::new());
         let notification_service = NotificationService::with_browser_action_service(db.clone(), browser_action_service.clone());
         
@@ -157,6 +163,8 @@ pub fn run() {
       commands::log_commands::read_recent_logs,
       commands::agent_commands::test_ollama_connection,
       commands::agent_commands::list_ollama_models,
+      commands::agent_commands::get_current_model,
+      commands::agent_commands::set_current_model,
       commands::agent_commands::analyze_task_with_ai,
       commands::agent_commands::create_project_plan,
       commands::agent_commands::parse_natural_language_task,
