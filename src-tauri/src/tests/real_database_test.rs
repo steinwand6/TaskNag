@@ -83,6 +83,7 @@ async fn test_real_database_tag_update() {
             parent_id: None,
             due_date: None,
             notification_settings: None,
+            browser_actions: None,
             tags: Some(vec![tag]),
         };
         

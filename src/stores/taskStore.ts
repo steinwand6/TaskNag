@@ -114,6 +114,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         parentId: updateData.parentId,
         dueDate: updateData.dueDate,
         notificationSettings: updateData.notificationSettings,
+        browserActions: updateData.browserActions,
         tags: updateData.tags,
       };
 

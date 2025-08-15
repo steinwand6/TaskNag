@@ -41,6 +41,10 @@ impl TaskService {
                 serde_json::to_string(&days).unwrap_or_default()
             ),
             notification_level: Some(notification_settings.level),
+            // Browser actions
+            browser_actions: request.browser_actions.map(|ba| 
+                serde_json::to_string(&ba).unwrap_or_default()
+            ),
             // Tag system
             tags: None,
         };
@@ -50,9 +54,9 @@ impl TaskService {
             INSERT INTO tasks (
                 id, title, description, status, parent_id, due_date, completed_at, 
                 created_at, updated_at, progress, notification_type, notification_days_before, 
-                notification_time, notification_days_of_week, notification_level
+                notification_time, notification_days_of_week, notification_level, browser_actions
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
             "#,
         )
         .bind(&task.id)
@@ -70,6 +74,7 @@ impl TaskService {
         .bind(&task.notification_time)
         .bind(&task.notification_days_of_week)
         .bind(task.notification_level)
+        .bind(&task.browser_actions)
         .execute(&self.db.pool)
         .await?;
         
@@ -79,7 +84,7 @@ impl TaskService {
     pub async fn get_tasks(&self) -> Result<Vec<Task>, AppError> {
         let mut tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
             FROM tasks
             ORDER BY 
                 CASE status 
@@ -111,7 +116,7 @@ impl TaskService {
     pub async fn get_task_by_id(&self, id: &str) -> Result<Task, AppError> {
         let mut task = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
             FROM tasks
             WHERE id = ?1
             "#,
@@ -134,7 +139,7 @@ impl TaskService {
         // Get existing task first (トランザクション内で実行)
         let mut task = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
             FROM tasks
             WHERE id = ?1
             "#,
@@ -179,6 +184,11 @@ impl TaskService {
             task.notification_level = Some(notification_settings.level);
         }
         
+        // ブラウザアクションの更新
+        if let Some(browser_actions) = request.browser_actions {
+            task.browser_actions = Some(serde_json::to_string(&browser_actions).unwrap_or_default());
+        }
+        
         task.updated_at = Utc::now().to_rfc3339();
         
         // メインのタスクレコードを先に更新
@@ -189,7 +199,7 @@ impl TaskService {
             SET title = ?2, description = ?3, status = ?4, 
                 parent_id = ?5, due_date = ?6, completed_at = ?7, updated_at = ?8, progress = ?9,
                 notification_type = ?10, notification_days_before = ?11, notification_time = ?12,
-                notification_days_of_week = ?13, notification_level = ?14
+                notification_days_of_week = ?13, notification_level = ?14, browser_actions = ?15
             WHERE id = ?1
             "#,
         )
@@ -207,6 +217,7 @@ impl TaskService {
         .bind(&task.notification_time)
         .bind(&task.notification_days_of_week)
         .bind(task.notification_level)
+        .bind(&task.browser_actions)
         .execute(&mut *tx)
         .await {
             Ok(result) => {
@@ -381,7 +392,7 @@ impl TaskService {
     pub async fn get_tasks_by_status(&self, status: &str) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
             FROM tasks
             WHERE status = ?1
             ORDER BY 
@@ -415,6 +426,7 @@ impl TaskService {
             parent_id: None,
             due_date: None,
             notification_settings: None,
+            browser_actions: None,
             tags: None,
         }).await
     }

@@ -1,6 +1,9 @@
 // Task status type
 export type TaskStatus = 'inbox' | 'todo' | 'in_progress' | 'done';
 
+// Import browser action types
+import { BrowserActionSettings } from './BrowserAction';
+
 // Tag interfaces
 export interface Tag {
   id: string;
@@ -55,6 +58,8 @@ export interface Task {
   progress?: number; // 進捗率 (0-100)
   // 新しい通知設定フィールド
   notificationSettings?: TaskNotificationSettings;
+  // ブラウザアクション設定
+  browserActions?: BrowserActionSettings;
   // タグシステム
   tags?: Tag[];
 }
@@ -68,6 +73,7 @@ export interface CreateTaskRequest {
   parentId?: string;
   dueDate?: Date;
   notificationSettings?: TaskNotificationSettings;
+  browserActions?: BrowserActionSettings;
   tags?: Tag[];
 }
 
@@ -79,6 +85,7 @@ export interface UpdateTaskRequest {
   parentId?: string;
   dueDate?: Date;
   notificationSettings?: TaskNotificationSettings;
+  browserActions?: BrowserActionSettings;
   tags?: Tag[];
 }
 

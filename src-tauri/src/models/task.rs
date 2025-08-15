@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::models::tag::Tag;
+use crate::models::browser_action::BrowserActionSettings;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
@@ -93,6 +94,8 @@ pub struct Task {
     pub notification_time: Option<String>,       // HH:MM形式
     pub notification_days_of_week: Option<String>, // JSON配列 "[0,1,2]"
     pub notification_level: Option<i32>,         // 1, 2, 3
+    // Browser actions for notifications
+    pub browser_actions: Option<String>,         // JSON stored browser action settings
     // Tag system
     #[sqlx(skip)]
     pub tags: Option<Vec<Tag>>,
@@ -119,6 +122,8 @@ impl Task {
             notification_time: None,
             notification_days_of_week: None,
             notification_level: Some(1),
+            // Browser actions
+            browser_actions: None,
             // Tag system
             tags: None,
         }
@@ -136,6 +141,8 @@ pub struct CreateTaskRequest {
     pub due_date: Option<DateTime<Utc>>,
     // Notification settings (replaces priority system)
     pub notification_settings: Option<TaskNotificationSettings>,
+    // Browser actions for notifications
+    pub browser_actions: Option<BrowserActionSettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -149,5 +156,7 @@ pub struct UpdateTaskRequest {
     pub due_date: Option<DateTime<Utc>>,
     // Notification settings (replaces priority system)
     pub notification_settings: Option<TaskNotificationSettings>,
+    // Browser actions for notifications
+    pub browser_actions: Option<BrowserActionSettings>,
     pub tags: Option<Vec<Tag>>,
 }

@@ -17,6 +17,9 @@ pub enum AppError {
     
     #[error("Internal error: {0}")]
     Internal(String),
+    
+    #[error("Parse error: {0}")]
+    ParseError(String),
 }
 
 #[derive(Debug, Serialize, Deserialize)]

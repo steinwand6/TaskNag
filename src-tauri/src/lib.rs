@@ -7,7 +7,7 @@ pub mod services;
 pub mod tests;
 
 use database::Database;
-use services::{TaskService, AgentService};
+use services::{TaskService, AgentService, BrowserActionService, NotificationService};
 use tauri::{
   AppHandle, Manager, WindowEvent, 
   tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
@@ -95,11 +95,15 @@ pub fn run() {
         
         // Initialize services
         let task_service = TaskService::new(db.clone());
-        let agent_service = AgentService::new(db.pool);
+        let agent_service = AgentService::new(db.pool.clone());
+        let browser_action_service = std::sync::Arc::new(BrowserActionService::new());
+        let notification_service = NotificationService::with_browser_action_service(db.clone(), browser_action_service.clone());
         
         // Add services to app state
         handle.manage(task_service);
         handle.manage(agent_service);
+        handle.manage(browser_action_service);
+        handle.manage(notification_service);
       });
       
       // Create system tray menu
@@ -155,6 +159,13 @@ pub fn run() {
       commands::agent_commands::create_project_plan,
       commands::agent_commands::parse_natural_language_task,
       commands::agent_commands::chat_with_agent,
+      commands::browser_commands::validate_url_command,
+      commands::browser_commands::test_browser_action_command,
+      commands::browser_commands::execute_browser_action_command,
+      commands::browser_commands::execute_browser_actions_command,
+      commands::browser_commands::test_url_command,
+      commands::browser_commands::get_url_suggestions_command,
+      commands::browser_commands::get_url_preview_command,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

@@ -36,4 +36,16 @@ impl Database {
         
         Ok(db)
     }
+
+    /// Create a placeholder Database for testing (requires a real pool to be set later)
+    pub fn new_placeholder() -> Self {
+        // Create a dummy pool that will be replaced in real usage
+        // This is only for Default trait implementation and testing
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("sqlite::memory:")
+            .unwrap();
+        
+        Self { pool }
+    }
 }

@@ -39,6 +39,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
                     notification_time TEXT DEFAULT NULL,
                     notification_days_of_week TEXT DEFAULT NULL,
                     notification_level INTEGER DEFAULT 1 CHECK(notification_level IN (1, 2, 3)),
+                    browser_actions TEXT DEFAULT NULL,
                     FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
                 )
                 "#,
@@ -52,7 +53,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
                 INSERT OR IGNORE INTO tasks_new (
                     id, title, description, status, parent_id, due_date, completed_at, 
                     created_at, updated_at, progress, notification_type, notification_days_before, 
-                    notification_time, notification_days_of_week, notification_level
+                    notification_time, notification_days_of_week, notification_level, browser_actions
                 )
                 SELECT 
                     id, title, description, status, parent_id, due_date, completed_at, 
@@ -60,7 +61,8 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
                     COALESCE(progress, 0) as progress,
                     COALESCE(notification_type, 'none') as notification_type,
                     notification_days_before, notification_time, notification_days_of_week,
-                    COALESCE(notification_level, 1) as notification_level
+                    COALESCE(notification_level, 1) as notification_level,
+                    NULL as browser_actions
                 FROM tasks
                 "#,
             )
@@ -107,6 +109,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
                 notification_time TEXT DEFAULT NULL,
                 notification_days_of_week TEXT DEFAULT NULL,
                 notification_level INTEGER DEFAULT 1 CHECK(notification_level IN (1, 2, 3)),
+                browser_actions TEXT DEFAULT NULL,
                 FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
             )
             "#,
@@ -205,6 +208,87 @@ pub async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await
     .ok(); // Ignore error if column already exists
+    
+    // Add browser_actions column to tasks table if it doesn't exist
+    sqlx::query(
+        r#"
+        ALTER TABLE tasks ADD COLUMN browser_actions TEXT DEFAULT NULL
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok(); // Ignore error if column already exists
+    
+    // Create agent_conversations table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS agent_conversations (
+            id TEXT PRIMARY KEY,
+            messages TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    
+    // Create agent_suggestions table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS agent_suggestions (
+            id TEXT PRIMARY KEY,
+            task_id TEXT,
+            suggestion_type TEXT NOT NULL,
+            content TEXT NOT NULL,
+            applied BOOLEAN DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    
+    // Create agent_config table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS agent_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    
+    // Create agent table indexes
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_suggestions_task_id ON agent_suggestions(task_id)")
+        .execute(pool)
+        .await?;
+    
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_suggestions_created_at ON agent_suggestions(created_at)")
+        .execute(pool)
+        .await?;
+    
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON agent_conversations(updated_at)")
+        .execute(pool)
+        .await?;
+    
+    // Insert default agent configuration
+    sqlx::query(
+        r#"
+        INSERT OR IGNORE INTO agent_config (key, value, updated_at) VALUES 
+            ('ollama_base_url', 'http://localhost:11434', datetime('now')),
+            ('default_model', 'llama3:latest', datetime('now')),
+            ('timeout_seconds', '30', datetime('now')),
+            ('auto_suggestions_enabled', 'false', datetime('now')),
+            ('streaming_enabled', 'true', datetime('now'))
+        "#,
+    )
+    .execute(pool)
+    .await?;
     
     Ok(())
 }
