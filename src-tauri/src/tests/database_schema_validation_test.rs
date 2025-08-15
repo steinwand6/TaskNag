@@ -127,6 +127,73 @@ async fn test_database_schema_validation() {
     assert!(foreign_keys.len() >= 2, "task_tags table should have at least 2 foreign key constraints");
     println!("✅ Foreign key constraints found: {:?}", foreign_keys);
     
+    // Verify agent_conversations table schema
+    println!("\nChecking agent_conversations table schema...");
+    let agent_conversations_columns: Vec<String> = sqlx::query("PRAGMA table_info(agent_conversations)")
+        .map(|row: sqlx::sqlite::SqliteRow| row.get::<String, _>("name"))
+        .fetch_all(&db.pool)
+        .await
+        .unwrap();
+    
+    let required_agent_conversations_columns = vec!["id", "messages", "created_at", "updated_at"];
+    for required_col in &required_agent_conversations_columns {
+        assert!(
+            agent_conversations_columns.contains(&required_col.to_string()),
+            "Required column '{}' is missing from agent_conversations table. Found columns: {:?}",
+            required_col,
+            agent_conversations_columns
+        );
+        println!("✅ Required column '{}' exists in agent_conversations table", required_col);
+    }
+    
+    // Verify agent_suggestions table schema
+    println!("\nChecking agent_suggestions table schema...");
+    let agent_suggestions_columns: Vec<String> = sqlx::query("PRAGMA table_info(agent_suggestions)")
+        .map(|row: sqlx::sqlite::SqliteRow| row.get::<String, _>("name"))
+        .fetch_all(&db.pool)
+        .await
+        .unwrap();
+    
+    let required_agent_suggestions_columns = vec!["id", "task_id", "suggestion_type", "content", "applied", "created_at"];
+    for required_col in &required_agent_suggestions_columns {
+        assert!(
+            agent_suggestions_columns.contains(&required_col.to_string()),
+            "Required column '{}' is missing from agent_suggestions table. Found columns: {:?}",
+            required_col,
+            agent_suggestions_columns
+        );
+        println!("✅ Required column '{}' exists in agent_suggestions table", required_col);
+    }
+    
+    // Verify agent_config table schema
+    println!("\nChecking agent_config table schema...");
+    let agent_config_columns: Vec<String> = sqlx::query("PRAGMA table_info(agent_config)")
+        .map(|row: sqlx::sqlite::SqliteRow| row.get::<String, _>("name"))
+        .fetch_all(&db.pool)
+        .await
+        .unwrap();
+    
+    let required_agent_config_columns = vec!["key", "value", "updated_at"];
+    for required_col in &required_agent_config_columns {
+        assert!(
+            agent_config_columns.contains(&required_col.to_string()),
+            "Required column '{}' is missing from agent_config table. Found columns: {:?}",
+            required_col,
+            agent_config_columns
+        );
+        println!("✅ Required column '{}' exists in agent_config table", required_col);
+    }
+    
+    // Test default agent configuration was inserted
+    println!("\nChecking default agent configuration...");
+    let config_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_config")
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    
+    assert!(config_count >= 5, "Expected at least 5 default config entries, found {}", config_count);
+    println!("✅ Default agent configuration inserted: {} entries", config_count);
+
     println!("\n🎉 All database schema validations passed!");
 }
 

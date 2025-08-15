@@ -67,7 +67,10 @@
       "Bash(curl:*)",
       "Bash(ollama list:*)",
       "Bash(git checkout:*)",
-      "mcp__serena__find_file"
+      "mcp__serena__find_file",
+      "Bash(refreshenv)",
+      "Bash(gh:*)",
+      "Bash(export:*)"
     ],
     "deny": [],
     "ask": [],
