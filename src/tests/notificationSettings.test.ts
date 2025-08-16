@@ -52,7 +52,7 @@ describe('Notification Settings Mapping', () => {
     expect(mappedTask.notificationSettings?.notificationTime).toBe('09:00');
     expect(mappedTask.notificationSettings?.daysOfWeek).toEqual([1, 2, 3, 4, 5]);
     expect(mappedTask.notificationSettings?.level).toBe(2);
-    expect(mappedTask.notificationSettings?.daysBefore).toBeUndefined();
+    expect(mappedTask.notificationSettings?.daysBefore).toBeNull();
   });
 
   test('should handle tasks without notification settings', () => {

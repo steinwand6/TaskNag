@@ -22,6 +22,8 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 
 ## Development Guidelines
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)
+- 変更の前には必ず対応するテストを作成する。
+- 変更後は必ずすべてのテストを実施し、エラーおよび警告がなくなってから作業を完了すること
 
 ## Workflow
 

@@ -48,6 +48,26 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   // Initialize form data when task changes
   React.useEffect(() => {
     if (task) {
+      console.log('EditTaskModal: Initializing with task:', task);
+      console.log('EditTaskModal: task.browserActions:', task.browserActions);
+      console.log('EditTaskModal: typeof task.browserActions:', typeof task.browserActions);
+      
+      let browserActionsData;
+      if (typeof task.browserActions === 'string') {
+        // JSONとしてパースする必要がある
+        try {
+          browserActionsData = JSON.parse(task.browserActions);
+          console.log('EditTaskModal: Parsed browserActions from JSON string:', browserActionsData);
+        } catch (e) {
+          console.error('EditTaskModal: Failed to parse browserActions JSON:', e);
+          browserActionsData = { enabled: false, actions: [] };
+        }
+      } else {
+        browserActionsData = task.browserActions || { enabled: false, actions: [] };
+      }
+      console.log('EditTaskModal: browserActionsData:', browserActionsData);
+      console.log('EditTaskModal: browserActionsData.actions:', browserActionsData.actions);
+      
       setFormData({
         title: task.title,
         description: task.description || '',
@@ -57,13 +77,12 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
           notificationType: 'none',
           level: 1,
         },
-        browserActions: task.browserActions || {
-          enabled: false,
-          actions: [],
-        },
+        browserActions: browserActionsData,
       });
       setSelectedTags(task.tags || []);
-      setBrowserActions(task.browserActions?.actions || []);
+      setBrowserActions(browserActionsData.actions);
+      
+      console.log('EditTaskModal: Set browserActions state to:', browserActionsData.actions);
     }
   }, [task]);
   
@@ -80,16 +99,23 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
     // 一時的なIDを持つタグを除外（実際のDBに存在するタグのみを保存）
     const validTags = selectedTags.filter(tag => !tag.id.startsWith('temp-'));
     
+    console.log('EditTaskModal: Saving task with data:');
+    console.log('  - formData.browserActions:', formData.browserActions);
+    console.log('  - browserActions state:', browserActions);
+    
+    const browserActionsToSave = {
+      enabled: formData.browserActions.enabled,
+      actions: formData.browserActions.actions,
+    };
+    console.log('  - browserActionsToSave:', browserActionsToSave);
+    
     updateTask(task.id, {
       title: formData.title,
       description: formData.description || undefined,
       status: formData.status,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
       notificationSettings: formData.notificationSettings,
-      browserActions: {
-        enabled: formData.browserActions.enabled,
-        actions: browserActions,
-      },
+      browserActions: browserActionsToSave,
       tags: validTags,
     });
     
@@ -103,13 +129,16 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
   
   const handleBrowserActionsChange = (actions: BrowserAction[]) => {
     setBrowserActions(actions);
-    // ブラウザアクションが設定されている場合は自動的に有効にする
-    if (actions.length > 0 && !formData.browserActions.enabled) {
-      setFormData({ 
-        ...formData, 
-        browserActions: { ...formData.browserActions, enabled: true }
-      });
-    }
+    // formData.browserActions.actionsも同期更新
+    setFormData(prev => ({
+      ...prev,
+      browserActions: {
+        ...prev.browserActions,
+        actions: actions,
+        // ブラウザアクションが設定されている場合は自動的に有効にする
+        enabled: actions.length > 0 ? true : prev.browserActions.enabled
+      }
+    }));
   };
   
   const handleBrowserActionToggle = (enabled: boolean) => {
@@ -354,7 +383,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, t
               
               {formData.browserActions.enabled && (
                 <URLActionConfig
-                  actions={browserActions}
+                  actions={browserActions || []}
                   onChange={handleBrowserActionsChange}
                   disabled={false}
                 />

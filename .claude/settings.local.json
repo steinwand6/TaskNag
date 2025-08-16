@@ -75,7 +75,8 @@
       "Bash(RUST_LOG=debug RUST_BACKTRACE=1 npm run tauri dev)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": [],

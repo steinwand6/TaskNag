@@ -11,7 +11,7 @@ import {
 } from '../types/BrowserAction';
 
 const URLActionConfig: React.FC<URLActionConfigProps> = ({
-  actions,
+  actions = [],
   onChange,
   maxActions = BROWSER_ACTION_CONSTRAINTS.MAX_ACTIONS,
   disabled = false
@@ -42,7 +42,7 @@ const URLActionConfig: React.FC<URLActionConfigProps> = ({
     }
 
     // Check for duplicate labels
-    if (actions.some(action => action.label.toLowerCase() === newAction.label.toLowerCase())) {
+    if (actions && actions.some(action => action.label.toLowerCase() === newAction.label.toLowerCase())) {
       newErrors.label = 'このラベルは既に使用されています';
     }
 
