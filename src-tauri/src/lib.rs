@@ -9,7 +9,7 @@ pub mod tests;
 use database::Database;
 use services::{TaskService, AgentService, PersonalityManager, BrowserActionService, NotificationService, ContextService};
 use tauri::{
-  AppHandle, Manager, WindowEvent, 
+  AppHandle, Manager, WindowEvent, Emitter,
   tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
   menu::{Menu, MenuItem, MenuEvent}
 };
@@ -61,6 +61,11 @@ async fn check_and_fire_notifications(
                     .body(&notification.title)
                     .show()
                     .map_err(|e| AppError::Internal(format!("通知送信エラー: {}", e)))?;
+            }
+            
+            // Level 2以上: 独自音を鳴らす
+            if notification.level >= 2 {
+                let _ = app_handle.emit("play_notification_sound", serde_json::json!({ "level": notification.level, "useCustomSound": true }));
             }
             
             // For level 3, maximize window

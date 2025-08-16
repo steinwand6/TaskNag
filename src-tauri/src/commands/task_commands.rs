@@ -1,6 +1,6 @@
 use crate::models::{CreateTaskRequest, Task, UpdateTaskRequest};
 use crate::services::{TaskService, NotificationService};
-use tauri::{AppHandle, State, Manager};
+use tauri::{AppHandle, State, Manager, Emitter};
 use tauri_plugin_notification::NotificationExt;
 
 #[tauri::command]
@@ -213,11 +213,10 @@ pub async fn send_windows_notification(
             .map_err(|e| e.to_string())?;
     }
     
-    // レベル2以上で追加の音を鳴らす場合のみ（オプショナル）
-    // 通常はWindows通知音で十分なのでコメントアウト
-    // if level >= 2 {
-    //     let _ = app.emit("play_notification_sound", serde_json::json!({ "level": level, "useCustomSound": true }));
-    // }
+    // レベル2以上で追加の独自音を鳴らす
+    if level >= 2 {
+        let _ = app.emit("play_notification_sound", serde_json::json!({ "level": level, "useCustomSound": true }));
+    }
     
     // レベル3でアプリを最大化
     if level >= 3 {
@@ -281,6 +280,11 @@ pub async fn force_notification_check(
                     .sound("default")
                     .show()
                     .map_err(|e| e.to_string())?;
+            }
+            
+            // Level 2以上: 独自音を鳴らす
+            if notification.level >= 2 {
+                let _ = app.emit("play_notification_sound", serde_json::json!({ "level": notification.level, "useCustomSound": true }));
             }
             
             // Level 3: maximize window

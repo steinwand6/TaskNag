@@ -66,10 +66,10 @@ function App() {
 
       LogService.info(`通知音を再生しました (Level ${level})`);
 
-      // レベル3の場合は複数回再生
+      // レベル3の場合は追加音を再生（再帰を避けるため別レベルを使用）
       if (level === 3) {
-        setTimeout(() => playNotificationSound(3), 500);
-        setTimeout(() => playNotificationSound(3), 1000);
+        setTimeout(() => playNotificationSound(2), 500);
+        setTimeout(() => playNotificationSound(2), 1000);
       }
     } catch (error) {
       LogService.error('通知音再生エラー:', error);

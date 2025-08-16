@@ -167,7 +167,15 @@ impl NotificationService {
         
         // Use local time directly (already in JST)
         let jst_time = current_time;
-        let current_weekday = jst_time.weekday().num_days_from_monday() + 1; // Monday = 1
+        let current_weekday = match jst_time.weekday() {
+            chrono::Weekday::Sun => 0,
+            chrono::Weekday::Mon => 1,
+            chrono::Weekday::Tue => 2,
+            chrono::Weekday::Wed => 3,
+            chrono::Weekday::Thu => 4,
+            chrono::Weekday::Fri => 5,
+            chrono::Weekday::Sat => 6,
+        };
         
         log::info!("NotificationService: Checking recurring notification for task '{}' - JST: {}, Target time: {}, Days: {:?}", 
                    task.title, jst_time.format("%Y-%m-%d %H:%M:%S"), notification_time, days_of_week);
@@ -188,21 +196,34 @@ impl NotificationService {
         let hour = time_parts[0].parse::<u32>().ok()?;
         let minute = time_parts[1].parse::<u32>().ok()?;
         
-        // Check if it's the right time (within 15 minutes after the target time)
-        let target_minutes = hour * 60 + minute;
-        let current_minutes = jst_time.hour() * 60 + jst_time.minute();
-        
-        // Fire notification if target time is within the previous 15 minutes (16-30 handles 16-30 minute notifications)
-        let time_diff_after = if current_minutes >= target_minutes {
-            current_minutes - target_minutes
-        } else {
-            // Handle day rollover (e.g., target 23:30, current 00:15)
-            (24 * 60 + current_minutes) - target_minutes
+        // Check if current time matches a 15-minute schedule slot that should fire this notification
+        let current_minute = jst_time.minute();
+        let current_slot = match current_minute {
+            0..=14 => 0,    // :00 slot
+            15..=29 => 15,  // :15 slot
+            30..=44 => 30,  // :30 slot
+            _ => 45,        // :45 slot
         };
         
-        if time_diff_after <= 15 {
-            log::info!("NotificationService: ✅ Firing recurring notification for task '{}' (target: {}:{:02}, current: {}:{:02}, diff: {} minutes)", 
-                      task.title, hour, minute, jst_time.hour(), jst_time.minute(), time_diff_after);
+        let target_minutes = hour * 60 + minute;
+        let current_minutes = jst_time.hour() * 60 + current_slot;
+        
+        // Check if the target notification time falls within this 15-minute slot
+        let slot_start = current_minutes;
+        let slot_end = current_minutes + 14; // 14 minutes after slot start
+        
+        let should_fire = if target_minutes >= slot_start && target_minutes <= slot_end {
+            true
+        } else if slot_start == 0 && target_minutes >= (24 * 60 - 15) {
+            // Handle day rollover: 23:45-23:59 should fire in 00:00 slot
+            true
+        } else {
+            false
+        };
+        
+        if should_fire {
+            log::info!("NotificationService: ✅ Firing recurring notification for task '{}' (target: {}:{:02}, current: {}:{:02}, slot: {}:{:02})", 
+                      task.title, hour, minute, jst_time.hour(), jst_time.minute(), jst_time.hour(), current_slot);
             
             Some(TaskNotification {
                 task_id: task.id.clone(),
@@ -212,8 +233,8 @@ impl NotificationService {
                 days_until_due: None,
             })
         } else {
-            log::info!("NotificationService: Time window missed for task '{}' (target: {}:{:02}, current: {}:{:02}, diff: {} minutes)", 
-                      task.title, hour, minute, jst_time.hour(), jst_time.minute(), time_diff_after);
+            log::info!("NotificationService: Time slot missed for task '{}' (target: {}:{:02}, current: {}:{:02}, slot: {:02})", 
+                      task.title, hour, minute, jst_time.hour(), jst_time.minute(), current_slot);
             None
         }
     }
