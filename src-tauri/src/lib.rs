@@ -7,7 +7,7 @@ pub mod services;
 pub mod tests;
 
 use database::Database;
-use services::{TaskService, AgentService, BrowserActionService, NotificationService};
+use services::{TaskService, AgentService, PersonalityManager, BrowserActionService, NotificationService, ContextService};
 use tauri::{
   AppHandle, Manager, WindowEvent, 
   tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
@@ -95,13 +95,23 @@ pub fn run() {
         
         // Initialize services
         let task_service = TaskService::new(db.clone());
-        let agent_service = AgentService::new(db.pool.clone());
+        let mut agent_service = AgentService::new(db.pool.clone());
+        let context_service = ContextService::new(db.pool.clone());
+        
+        // Load saved configuration if exists
+        agent_service.load_saved_config().await.ok();
+        
+        let mut personality_manager_instance = PersonalityManager::new_with_db(Some(db.pool.clone()));
+        personality_manager_instance.load_saved_personality().await.ok();
+        let personality_manager = std::sync::Arc::new(std::sync::RwLock::new(personality_manager_instance));
         let browser_action_service = std::sync::Arc::new(BrowserActionService::new());
         let notification_service = NotificationService::with_browser_action_service(db.clone(), browser_action_service.clone());
         
         // Add services to app state
         handle.manage(task_service);
         handle.manage(agent_service);
+        handle.manage(context_service);
+        handle.manage(personality_manager);
         handle.manage(browser_action_service);
         handle.manage(notification_service);
       });
@@ -155,10 +165,19 @@ pub fn run() {
       commands::log_commands::read_recent_logs,
       commands::agent_commands::test_ollama_connection,
       commands::agent_commands::list_ollama_models,
+      commands::agent_commands::list_ollama_models_detailed,
+      commands::agent_commands::get_agent_config,
+      commands::agent_commands::get_model_preference,
+      commands::agent_commands::get_model_preferences_for_available_models,
+      commands::agent_commands::get_current_model,
+      commands::agent_commands::set_current_model,
       commands::agent_commands::analyze_task_with_ai,
       commands::agent_commands::create_project_plan,
       commands::agent_commands::parse_natural_language_task,
       commands::agent_commands::chat_with_agent,
+      commands::agent_commands::get_available_personalities,
+      commands::agent_commands::set_ai_personality,
+      commands::agent_commands::get_current_personality,
       commands::browser_commands::validate_url_command,
       commands::browser_commands::test_browser_action_command,
       commands::browser_commands::execute_browser_action_command,
@@ -166,6 +185,27 @@ pub fn run() {
       commands::browser_commands::test_url_command,
       commands::browser_commands::get_url_suggestions_command,
       commands::browser_commands::get_url_preview_command,
+      commands::context_commands::get_temporal_context,
+      commands::context_commands::get_task_context,
+      commands::context_commands::get_basic_context,
+      commands::context_commands::get_context_for_scope,
+      commands::context_commands::get_context_as_prompt_variables,
+      commands::prompt_commands::get_prompt_templates,
+      commands::prompt_commands::get_prompt_template,
+      commands::prompt_commands::generate_prompt,
+      commands::prompt_commands::generate_task_consultation_prompt,
+      commands::prompt_commands::generate_planning_prompt,
+      commands::prompt_commands::generate_motivation_prompt,
+      commands::prompt_commands::get_prompt_categories,
+      commands::enhanced_agent_commands::chat_with_task_consultation,
+      commands::enhanced_agent_commands::chat_with_planning_assistance,
+      commands::enhanced_agent_commands::generate_motivation_boost,
+      commands::enhanced_agent_commands::get_current_context,
+      commands::enhanced_agent_commands::generate_context_aware_prompt,
+      commands::enhanced_agent_commands::analyze_task_with_context,
+      commands::enhanced_agent_commands::get_task_consultation_prompt,
+      commands::enhanced_agent_commands::get_planning_prompt,
+      commands::enhanced_agent_commands::get_motivation_prompt,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

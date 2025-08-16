@@ -14,14 +14,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     progress INTEGER DEFAULT 0 CHECK(progress >= 0 AND progress <= 100),
     
     -- Notification settings (replaces priority system)
-    notification_type TEXT CHECK(notification_type IN ('none', 'due_date_based', 'recurring')),
-    notification_days_before INTEGER,
-    notification_time TEXT, -- HH:MM format
-    notification_days_of_week TEXT, -- JSON array: "[0,1,2,3,4,5,6]" where 0=Sunday
-    notification_level INTEGER CHECK(notification_level IN (1, 2, 3)),
+    notification_type TEXT DEFAULT 'none' CHECK(notification_type IN ('none', 'due_date_based', 'recurring')),
+    notification_days_before INTEGER DEFAULT NULL,
+    notification_time TEXT DEFAULT NULL, -- HH:MM format
+    notification_days_of_week TEXT DEFAULT NULL, -- JSON array: "[0,1,2,3,4,5,6]" where 0=Sunday
+    notification_level INTEGER DEFAULT 1 CHECK(notification_level IN (1, 2, 3)),
     
     -- Browser actions for notifications (JSON)
-    browser_actions TEXT, -- JSON: {"enabled": true, "actions": [...]}
+    browser_actions TEXT DEFAULT NULL, -- JSON: {"enabled": true, "actions": [...]}
     
     FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
@@ -30,8 +30,9 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    color TEXT,
-    created_at TEXT NOT NULL
+    color TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 
 -- Task-Tags junction table

@@ -10,6 +10,7 @@ import { TagManager } from './components/TagManager';
 import { TaskFilter } from './components/TaskFilter';
 import { AgentChat } from './components/AgentChat';
 import { SmartTaskCreator } from './components/SmartTaskCreator';
+import { AISettings } from './components/AISettings';
 import { STATUS_CONFIG, VISIBLE_STATUSES } from './constants';
 import { useModal, useDragAndDrop, useNotifications } from './hooks';
 
@@ -32,6 +33,7 @@ function App() {
   // State for AI features
   const [showAgentChat, setShowAgentChat] = React.useState(false);
   const [showSmartCreator, setShowSmartCreator] = React.useState(false);
+  const [showAISettings, setShowAISettings] = React.useState(false);
   
   // Custom hooks
   const { isModalOpen, modalInitialStatus, openModal, closeModal } = useModal();
@@ -136,6 +138,7 @@ function App() {
         hasActiveFilters={selectedTags.length > 0 || searchQuery.trim().length > 0}
         onOpenAgentChat={() => setShowAgentChat(true)}
         onOpenSmartCreator={() => setShowSmartCreator(true)}
+        onOpenAISettings={() => setShowAISettings(true)}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -192,6 +195,11 @@ function App() {
       <SmartTaskCreator
         isOpen={showSmartCreator}
         onClose={() => setShowSmartCreator(false)}
+      />
+
+      <AISettings
+        isOpen={showAISettings}
+        onClose={() => setShowAISettings(false)}
       />
 
     </div>

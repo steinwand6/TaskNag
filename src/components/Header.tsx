@@ -11,6 +11,7 @@ interface HeaderProps {
   hasActiveFilters?: boolean;
   onOpenAgentChat?: () => void;
   onOpenSmartCreator?: () => void;
+  onOpenAISettings?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -23,7 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
   showFilters = false, 
   hasActiveFilters = false,
   onOpenAgentChat,
-  onOpenSmartCreator
+  onOpenSmartCreator,
+  onOpenAISettings
 }) => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -92,6 +94,16 @@ export const Header: React.FC<HeaderProps> = ({
                 title="AIアシスタントとチャット"
               >
                 💬 AI相談
+              </button>
+            )}
+            {onOpenAISettings && (
+              <button 
+                onClick={onOpenAISettings}
+                className="px-3 py-2 text-sm rounded-md bg-indigo-100 text-indigo-800 border border-indigo-300 hover:bg-indigo-200 transition-colors"
+                disabled={isLoading}
+                title="AI性格設定"
+              >
+                🎭 AI設定
               </button>
             )}
             <button 

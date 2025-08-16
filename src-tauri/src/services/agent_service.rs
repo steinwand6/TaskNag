@@ -1,4 +1,6 @@
 use crate::services::ollama_client::{OllamaClient, OllamaError, GenerateOptions};
+use crate::services::context_service::{ContextService, ContextError};
+use crate::services::prompt_manager::{EnhancedPromptManager, PromptError, GeneratedPrompt};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use thiserror::Error;
@@ -20,6 +22,12 @@ pub enum AgentError {
     
     #[error("Invalid prompt: {0}")]
     InvalidPrompt(String),
+    
+    #[error("Context error: {0}")]
+    ContextError(#[from] ContextError),
+    
+    #[error("Prompt error: {0}")]
+    PromptError(#[from] PromptError),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,27 +201,120 @@ impl PromptManager {
 pub struct AgentService {
     ollama: OllamaClient,
     prompt_manager: PromptManager,
-    db: SqlitePool,
+    enhanced_prompt_manager: EnhancedPromptManager,
+    context_service: ContextService,
+    pub db: SqlitePool,
+    pub config: AgentConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConfig {
+    pub default_model: String,
+    pub base_url: String,
+    pub timeout_seconds: u64,
+    pub available_models: Vec<String>,
+    pub model_preferences: std::collections::HashMap<String, ModelPreference>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelPreference {
+    pub display_name: String,
+    pub description: String,
+    pub recommended_for: Vec<String>,
+    pub performance_tier: ModelPerformanceTier,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ModelPerformanceTier {
+    Fast,      // 高速だが品質は控えめ
+    Balanced,  // バランス型
+    Quality,   // 高品質だが時間がかかる
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        let mut model_preferences = std::collections::HashMap::new();
+        
+        // 一般的なモデルの推奨設定
+        model_preferences.insert(
+            "gemma3:12b".to_string(),
+            ModelPreference {
+                display_name: "Gemma3 12B".to_string(),
+                description: "高品質な日本語対応モデル、タスク分析に最適".to_string(),
+                recommended_for: vec!["タスク分析".to_string(), "プロジェクト計画".to_string()],
+                performance_tier: ModelPerformanceTier::Quality,
+            }
+        );
+        
+        model_preferences.insert(
+            "llama3:latest".to_string(),
+            ModelPreference {
+                display_name: "Llama3 Latest".to_string(),
+                description: "バランス型の汎用モデル".to_string(),
+                recommended_for: vec!["一般的なチャット".to_string(), "タスク作成".to_string()],
+                performance_tier: ModelPerformanceTier::Balanced,
+            }
+        );
+        
+        model_preferences.insert(
+            "llama3:8b".to_string(),
+            ModelPreference {
+                display_name: "Llama3 8B".to_string(),
+                description: "軽量で高速なモデル".to_string(),
+                recommended_for: vec!["簡単なタスク".to_string(), "クイックチャット".to_string()],
+                performance_tier: ModelPerformanceTier::Fast,
+            }
+        );
+        
+        Self {
+            default_model: "gemma3:12b".to_string(),
+            base_url: "http://localhost:11434".to_string(),
+            timeout_seconds: 60,
+            available_models: vec![],
+            model_preferences,
+        }
+    }
 }
 
 impl AgentService {
     pub fn new(db: SqlitePool) -> Self {
+        log::info!("Initializing AgentService with enhanced context support");
+        let config = AgentConfig::default();
+        
+        let enhanced_prompt_manager = EnhancedPromptManager::new(db.clone());
+        let context_service = ContextService::new(db.clone());
+        
+        log::info!("AgentService components initialized successfully");
+        
         Self {
             ollama: OllamaClient::new(
-                "http://localhost:11434".to_string(),
-                "gemma3:12b".to_string(),
-                60  // タイムアウトも60秒に延長
+                config.base_url.clone(),
+                config.default_model.clone(),
+                config.timeout_seconds
             ),
             prompt_manager: PromptManager::new(),
+            enhanced_prompt_manager,
+            context_service,
             db,
+            config,
         }
     }
     
     pub fn with_custom_ollama(db: SqlitePool, base_url: String, model: String) -> Self {
+        let config = AgentConfig {
+            base_url: base_url.clone(),
+            default_model: model.clone(),
+            timeout_seconds: 30,
+            ..Default::default()
+        };
+        
         Self {
             ollama: OllamaClient::new(base_url, model, 30),
             prompt_manager: PromptManager::new(),
+            enhanced_prompt_manager: EnhancedPromptManager::new(db.clone()),
+            context_service: ContextService::new(db.clone()),
             db,
+            config,
         }
     }
     
@@ -222,10 +323,170 @@ impl AgentService {
         Ok(self.ollama.test_connection().await?)
     }
     
-    /// List available models
-    pub async fn list_models(&self) -> Result<Vec<String>, AgentError> {
+    /// List available models with detailed information
+    pub async fn list_models(&self) -> Result<Vec<crate::services::ollama_client::ModelInfo>, AgentError> {
+        let models = self.ollama.list_models().await?;
+        Ok(models)
+    }
+    
+    /// List available model names (simple list)
+    pub async fn list_model_names(&self) -> Result<Vec<String>, AgentError> {
         let models = self.ollama.list_models().await?;
         Ok(models.into_iter().map(|m| m.name).collect())
+    }
+    
+    /// Get current model name
+    pub fn get_current_model(&self) -> String {
+        self.ollama.get_model().clone()
+    }
+    
+    /// Set model (for dynamic model changing) and save to database
+    pub async fn set_model(&mut self, model: String) -> Result<(), AgentError> {
+        // Update the client with new model
+        self.ollama = OllamaClient::new(
+            self.ollama.base_url.clone(),
+            model.clone(),
+            self.ollama.timeout_seconds
+        );
+        
+        // Save to database
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('current_model', ?1, datetime('now'))
+            "#
+        )
+        .bind(&model)
+        .execute(&self.db)
+        .await?;
+        
+        Ok(())
+    }
+    
+    /// Load model from database
+    pub async fn load_saved_model(&mut self) -> Result<(), AgentError> {
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM agent_config WHERE key = 'current_model'"
+        )
+        .fetch_optional(&self.db)
+        .await 
+        {
+            let saved_model = row.0;
+            self.config.default_model = saved_model.clone();
+            self.ollama = OllamaClient::new(
+                self.config.base_url.clone(),
+                saved_model,
+                self.config.timeout_seconds
+            );
+        }
+        Ok(())
+    }
+    
+    /// Get agent configuration
+    pub fn get_config(&self) -> &AgentConfig {
+        &self.config
+    }
+    
+    /// Update agent configuration
+    pub async fn update_config(&mut self, new_config: AgentConfig) -> Result<(), AgentError> {
+        // Update Ollama client with new settings
+        self.ollama = OllamaClient::new(
+            new_config.base_url.clone(),
+            new_config.default_model.clone(),
+            new_config.timeout_seconds
+        );
+        
+        // Save default model to database
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('current_model', ?1, datetime('now'))
+            "#
+        )
+        .bind(&new_config.default_model)
+        .execute(&self.db)
+        .await?;
+        
+        // Save base URL to database
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('base_url', ?1, datetime('now'))
+            "#
+        )
+        .bind(&new_config.base_url)
+        .execute(&self.db)
+        .await?;
+        
+        // Save timeout to database
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO agent_config (key, value, updated_at) 
+            VALUES ('timeout_seconds', ?1, datetime('now'))
+            "#
+        )
+        .bind(new_config.timeout_seconds.to_string())
+        .execute(&self.db)
+        .await?;
+        
+        // Update in-memory config
+        self.config = new_config;
+        
+        Ok(())
+    }
+    
+    /// Load full configuration from database
+    pub async fn load_saved_config(&mut self) -> Result<(), AgentError> {
+        // Load saved model
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM agent_config WHERE key = 'current_model'"
+        )
+        .fetch_optional(&self.db)
+        .await 
+        {
+            self.config.default_model = row.0;
+        }
+        
+        // Load saved base URL
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM agent_config WHERE key = 'base_url'"
+        )
+        .fetch_optional(&self.db)
+        .await 
+        {
+            self.config.base_url = row.0;
+        }
+        
+        // Load saved timeout
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM agent_config WHERE key = 'timeout_seconds'"
+        )
+        .fetch_optional(&self.db)
+        .await 
+        {
+            if let Ok(timeout) = row.0.parse::<u64>() {
+                self.config.timeout_seconds = timeout;
+            }
+        }
+        
+        // Update Ollama client with loaded config
+        self.ollama = OllamaClient::new(
+            self.config.base_url.clone(),
+            self.config.default_model.clone(),
+            self.config.timeout_seconds
+        );
+        
+        Ok(())
+    }
+    
+    /// Get model preferences for a specific model
+    pub fn get_model_preference(&self, model_name: &str) -> Option<&ModelPreference> {
+        self.config.model_preferences.get(model_name)
+    }
+    
+    /// Add or update model preference
+    pub fn set_model_preference(&mut self, model_name: String, preference: ModelPreference) {
+        self.config.model_preferences.insert(model_name, preference);
     }
     
     /// Analyze a task description and provide suggestions
@@ -288,11 +549,13 @@ impl AgentService {
     
     /// Chat with the agent
     pub async fn chat(&self, message: &str, context: Option<String>) -> Result<String, AgentError> {
-        let mut prompt = format!("あなたは親切なアシスタントです。日本語で自然に会話してください。\n\nユーザー: {}", message);
+        let mut base_prompt = format!("日本語で自然に会話してください。\n\nユーザー: {}", message);
         
         if let Some(ctx) = context {
-            prompt = format!("Context: {}\n\n{}", ctx, prompt);
+            base_prompt = format!("Context: {}\n\n{}", ctx, base_prompt);
         }
+        
+        let prompt = base_prompt;
         
         let options = GenerateOptions {
             temperature: Some(0.8),
@@ -303,6 +566,142 @@ impl AgentService {
         
         let response = self.ollama.generate(&prompt, Some(options)).await?;
         Ok(OllamaClient::get_response_content(&response))
+    }
+    
+    /// Chat with custom prompt (for personality-enhanced prompts)  
+    pub async fn chat_with_personality(&self, message: &str, is_personality_enhanced: bool) -> Result<String, AgentError> {
+        let prompt = if is_personality_enhanced {
+            // 既に性格が適用されたプロンプト
+            message.to_string()
+        } else {
+            // 通常のプロンプト
+            format!("日本語で自然に会話してください。\n\n{}", message)
+        };
+        
+        let options = GenerateOptions {
+            temperature: Some(0.8),
+            num_predict: Some(1000),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&prompt, Some(options)).await?;
+        Ok(OllamaClient::get_response_content(&response))
+    }
+    
+    /// Generate context-aware prompt using EnhancedPromptManager
+    pub async fn generate_context_aware_prompt(&self, template_id: &str) -> Result<GeneratedPrompt, AgentError> {
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt(template_id).await?;
+        Ok(generated_prompt)
+    }
+    
+    /// Chat with context-aware prompt for task consultation
+    pub async fn chat_with_task_consultation(&self, user_message: &str) -> Result<String, AgentError> {
+        log::info!("Starting task consultation with context awareness");
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt("task_consultation").await
+            .map_err(|e| {
+                log::error!("Failed to generate task consultation prompt: {}", e);
+                e
+            })?;
+        
+        let full_prompt = format!(
+            "{}\n\n## ユーザーの相談\n{}\n\n上記の状況を踏まえて、親身になってアドバイスしてください。",
+            generated_prompt.final_prompt,
+            user_message
+        );
+        
+        let options = GenerateOptions {
+            temperature: Some(0.7),
+            num_predict: Some(1500),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&full_prompt, Some(options)).await
+            .map_err(|e| {
+                log::error!("Ollama request failed for task consultation: {}", e);
+                e
+            })?;
+        
+        log::info!("Task consultation completed successfully");
+        Ok(OllamaClient::get_response_content(&response))
+    }
+    
+    /// Chat with context-aware prompt for planning assistance
+    pub async fn chat_with_planning_assistance(&self, user_message: &str) -> Result<String, AgentError> {
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt("planning_assistant").await?;
+        
+        let full_prompt = format!(
+            "{}\n\n## 計画したい内容\n{}\n\n効率的で実現可能な計画を一緒に立てましょう。",
+            generated_prompt.final_prompt,
+            user_message
+        );
+        
+        let options = GenerateOptions {
+            temperature: Some(0.6),
+            num_predict: Some(2000),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&full_prompt, Some(options)).await?;
+        Ok(OllamaClient::get_response_content(&response))
+    }
+    
+    /// Generate motivation boost message
+    pub async fn generate_motivation_boost(&self) -> Result<String, AgentError> {
+        let generated_prompt = self.enhanced_prompt_manager.generate_prompt("motivation_boost").await?;
+        
+        let options = GenerateOptions {
+            temperature: Some(0.8),
+            num_predict: Some(800),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&generated_prompt.final_prompt, Some(options)).await?;
+        Ok(OllamaClient::get_response_content(&response))
+    }
+    
+    /// Get current context information
+    pub async fn get_current_context(&self) -> Result<Vec<crate::services::context_service::ContextData>, AgentError> {
+        let context_data = self.context_service.collect_basic_context().await?;
+        Ok(context_data)
+    }
+    
+    /// Enhanced task analysis with context awareness
+    pub async fn analyze_task_with_context(&self, description: &str) -> Result<TaskAnalysis, AgentError> {
+        // 基本的なコンテキストを取得
+        let context_data = self.context_service.collect_basic_context().await?;
+        
+        // コンテキスト情報を文字列として構築
+        let mut context_info = String::new();
+        for data in context_data {
+            context_info.push_str(&format!("## {}\n", data.context_type));
+            for (key, value) in data.data {
+                context_info.push_str(&format!("- {}: {}\n", key, value));
+            }
+            context_info.push('\n');
+        }
+        
+        let mut vars = std::collections::HashMap::new();
+        vars.insert("task_description".to_string(), description.to_string());
+        vars.insert("context_info".to_string(), context_info);
+        
+        let prompt = self.prompt_manager.build_prompt("task_analysis", &vars)?;
+        
+        let options = GenerateOptions {
+            temperature: Some(0.4),
+            num_predict: Some(2000),
+            top_k: None,
+            top_p: None,
+        };
+        
+        let response = self.ollama.generate(&prompt, Some(options)).await?;
+        let json_response = OllamaClient::get_response_content(&response);
+        
+        let analysis: TaskAnalysis = serde_json::from_str(&json_response)?;
+        Ok(analysis)
     }
     
     /// Save conversation to database
@@ -372,5 +771,116 @@ mod tests {
         
         let prompt = manager.build_prompt("task_analysis", &vars).unwrap();
         assert!(prompt.contains("Test task"));
+    }
+    
+    #[tokio::test]
+    async fn test_model_management() {
+        // テスト用のインメモリデータベース
+        let db = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+        
+        // テスト用マイグレーション（agent_configテーブル）
+        sqlx::query(
+            r#"
+            CREATE TABLE agent_config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            "#
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+        
+        // AgentServiceインスタンス作成
+        let mut agent_service = AgentService::new(db.clone());
+        
+        // デフォルトモデル確認
+        let initial_model = agent_service.get_current_model();
+        assert_eq!(initial_model, "gemma3:12b");
+        
+        // モデル変更とデータベース保存
+        let new_model = "llama3:latest".to_string();
+        agent_service.set_model(new_model.clone()).await.unwrap();
+        
+        // モデルが変更されたことを確認
+        assert_eq!(agent_service.get_current_model(), new_model);
+        
+        // データベースに保存されたことを確認
+        let saved_model: (String,) = sqlx::query_as(
+            "SELECT value FROM agent_config WHERE key = 'current_model'"
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(saved_model.0, new_model);
+        
+        // 新しいAgentServiceインスタンスで保存されたモデルを読み込み
+        let mut new_agent_service = AgentService::new(db.clone());
+        new_agent_service.load_saved_model().await.unwrap();
+        
+        // 読み込まれたモデルが正しいことを確認
+        assert_eq!(new_agent_service.get_current_model(), new_model);
+    }
+    
+    #[test]
+    fn test_ollama_client_model_getter() {
+        let client = OllamaClient::new(
+            "http://localhost:11434".to_string(),
+            "test-model".to_string(),
+            30
+        );
+        
+        assert_eq!(client.get_model(), "test-model");
+    }
+    
+    #[tokio::test]
+    async fn test_enhanced_agent_service_integration() {
+        // テスト用のインメモリデータベース
+        let db = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+        
+        // テーブル作成
+        sqlx::query(r#"
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                description TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                priority TEXT NOT NULL DEFAULT 'medium',
+                due_date TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                parent_id INTEGER,
+                project_id TEXT,
+                estimated_time INTEGER,
+                actual_time INTEGER,
+                difficulty INTEGER DEFAULT 1,
+                progress INTEGER DEFAULT 0,
+                notification_settings TEXT,
+                FOREIGN KEY (parent_id) REFERENCES tasks (id)
+            )
+        "#)
+        .execute(&db)
+        .await
+        .unwrap();
+        
+        // AgentServiceインスタンス作成
+        let agent_service = AgentService::new(db.clone());
+        
+        // コンテキスト取得テスト
+        let context_result = agent_service.get_current_context().await;
+        assert!(context_result.is_ok());
+        let context_data = context_result.unwrap();
+        assert!(!context_data.is_empty());
+        
+        // プロンプト生成テスト
+        let prompt_result = agent_service.generate_context_aware_prompt("task_consultation").await;
+        assert!(prompt_result.is_ok());
+        let generated_prompt = prompt_result.unwrap();
+        assert_eq!(generated_prompt.template_id, "task_consultation");
+        assert!(!generated_prompt.final_prompt.is_empty());
+        
+        // 統合が正しく動作していることを確認
+        assert!(generated_prompt.final_prompt.contains("TaskNagAI"));
     }
 }
