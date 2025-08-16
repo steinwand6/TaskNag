@@ -24,4 +24,6 @@ pub mod browser_action_manual_test;
 pub mod browser_action_task_integration_test;
 #[cfg(test)]
 pub mod database_schema_validation_test;
+#[cfg(test)]
+pub mod real_db_schema_check;
 // pub mod subtask_notification_tests;

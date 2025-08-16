@@ -114,6 +114,8 @@ impl TaskService {
     }
     
     pub async fn get_task_by_id(&self, id: &str) -> Result<Task, AppError> {
+        log::info!("Getting task by id: {}", id);
+        
         let mut task = sqlx::query_as::<_, Task>(
             r#"
             SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
@@ -123,11 +125,29 @@ impl TaskService {
         )
         .bind(id)
         .fetch_optional(&self.db.pool)
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("Task with id {} not found", id)))?;
+        .await
+        .map_err(|e| {
+            log::error!("Database error in get_task_by_id for id {}: {}", id, e);
+            AppError::Database(e)
+        })?
+        .ok_or_else(|| {
+            log::warn!("Task not found with id: {}", id);
+            AppError::NotFound(format!("Task with id {} not found", id))
+        })?;
+        
+        log::info!("Successfully retrieved task: {} (title: {})", task.id, task.title);
         
         // タグ情報を追加
-        task.tags = self.get_tags_for_task(&task.id).await.ok();
+        match self.get_tags_for_task(&task.id).await {
+            Ok(tags) => {
+                task.tags = Some(tags);
+                log::debug!("Added {} tags to task {}", task.tags.as_ref().map(|t| t.len()).unwrap_or(0), task.id);
+            }
+            Err(e) => {
+                log::warn!("Failed to get tags for task {}: {}", task.id, e);
+                task.tags = None;
+            }
+        }
         
         Ok(task)
     }
@@ -449,7 +469,7 @@ impl TaskService {
     pub async fn get_children(&self, parent_id: &str) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
             FROM tasks
             WHERE parent_id = ?1
             ORDER BY created_at ASC
@@ -560,7 +580,7 @@ impl TaskService {
     pub async fn get_root_tasks(&self) -> Result<Vec<Task>, AppError> {
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
             FROM tasks
             WHERE parent_id IS NULL
             ORDER BY 
@@ -591,7 +611,7 @@ impl TaskService {
         
         let tasks = sqlx::query_as::<_, Task>(
             r#"
-            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level
+            SELECT id, title, description, status, parent_id, due_date, completed_at, created_at, updated_at, progress, notification_type, notification_days_before, notification_time, notification_days_of_week, notification_level, browser_actions
             FROM tasks
             WHERE status != 'done' 
               AND notification_type IS NOT NULL 

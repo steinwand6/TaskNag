@@ -72,7 +72,10 @@
       "Bash(gh:*)",
       "Bash(export:*)",
       "Bash(RUST_LOG=debug npm run tauri dev)",
-      "Bash(RUST_LOG=debug RUST_BACKTRACE=1 npm run tauri dev)"
+      "Bash(RUST_LOG=debug RUST_BACKTRACE=1 npm run tauri dev)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": [],

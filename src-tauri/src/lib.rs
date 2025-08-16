@@ -70,13 +70,19 @@ pub fn run() {
       }
     })
     .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      // ログプラグインを常に有効化（デバッグ・リリース両方）
+      app.handle().plugin(
+        tauri_plugin_log::Builder::default()
+          .level(log::LevelFilter::Debug)
+          .targets([
+            tauri_plugin_log::Target::new(
+              tauri_plugin_log::TargetKind::LogDir { file_name: Some("tasknag".to_string()) }
+            ),
+            tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout)
+          ])
+          .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+          .build(),
+      )?;
       
       // 通知プラグインを初期化
       app.handle().plugin(tauri_plugin_notification::init())?;

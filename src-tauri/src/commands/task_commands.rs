@@ -21,10 +21,18 @@ pub async fn get_tasks(service: State<'_, TaskService>) -> Result<Vec<Task>, Str
 
 #[tauri::command]
 pub async fn get_task_by_id(id: String, service: State<'_, TaskService>) -> Result<Task, String> {
-    service
-        .get_task_by_id(&id)
-        .await
-        .map_err(|e| e.to_string())
+    log::info!("Command: get_task_by_id called with id: {}", id);
+    
+    match service.get_task_by_id(&id).await {
+        Ok(task) => {
+            log::info!("Command: get_task_by_id succeeded for id: {}", id);
+            Ok(task)
+        }
+        Err(e) => {
+            log::error!("Command: get_task_by_id failed for id {}: {}", id, e);
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]

@@ -190,6 +190,7 @@ impl NotificationService {
 
     /// アクティブなタスクを取得
     async fn get_active_tasks(&self) -> Result<Vec<Task>, AppError> {
+        log::info!("NotificationService: Executing get_active_tasks query");
         let tasks = sqlx::query_as::<_, Task>(
             r#"
             SELECT id, title, description, status, parent_id, due_date, completed_at, 
@@ -203,6 +204,7 @@ impl NotificationService {
         .fetch_all(&self.db.pool)
         .await?;
         
+        log::info!("NotificationService: Retrieved {} active tasks", tasks.len());
         Ok(tasks)
     }
 
