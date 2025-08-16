@@ -67,4 +67,4 @@ coverage/
 
 # Tauri specific
 /src-tauri/tauri.conf.json.bak
-/src-tauri/icons/
+/src-tauri/icons/.claude/
