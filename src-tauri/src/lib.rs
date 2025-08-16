@@ -13,6 +13,69 @@ use tauri::{
   tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
   menu::{Menu, MenuItem, MenuEvent}
 };
+use tauri_plugin_notification::NotificationExt;
+use error::AppError;
+
+// Helper function to check and fire notifications
+async fn check_and_fire_notifications(
+    notification_service: &NotificationService,
+    app_handle: &AppHandle,
+) -> Result<(), AppError> {
+    use chrono::Local;
+    let current_time = Local::now();
+    let notifications = notification_service.check_notifications(current_time).await?;
+    
+    if !notifications.is_empty() {
+        log::info!("発火する通知: {}件", notifications.len());
+        
+        for notification in notifications {
+            log::info!("通知発火: {} (Level {})", notification.title, notification.level);
+            
+            // Fire the notification (includes browser actions)
+            notification_service.fire_notification(&notification).await?;
+            
+            // Send Windows notification
+            let title = match notification.notification_type.as_str() {
+                "due_date_based" => format!("📅 期日通知"),
+                "recurring" => format!("🔔 定期通知"),
+                _ => format!("📋 通知"),
+            };
+            
+            // Use Tauri notification plugin with sound for Windows
+            #[cfg(target_os = "windows")]
+            {
+                app_handle.notification()
+                    .builder()
+                    .title(&title)
+                    .body(&notification.title)
+                    .sound("Default")  // Windows default notification sound
+                    .show()
+                    .map_err(|e| AppError::Internal(format!("通知送信エラー: {}", e)))?;
+            }
+            
+            #[cfg(not(target_os = "windows"))]
+            {
+                app_handle.notification()
+                    .builder()
+                    .title(&title)
+                    .body(&notification.title)
+                    .show()
+                    .map_err(|e| AppError::Internal(format!("通知送信エラー: {}", e)))?;
+            }
+            
+            // For level 3, maximize window
+            if notification.level >= 3 {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
 
 fn handle_tray_event(app: &AppHandle, event: TrayIconEvent) {
   match event {
@@ -113,6 +176,63 @@ pub fn run() {
         let browser_action_service = std::sync::Arc::new(BrowserActionService::new());
         let notification_service = NotificationService::with_browser_action_service(db.clone(), browser_action_service.clone());
         
+        // Clone for notification scheduler
+        let notification_service_clone = notification_service.clone();
+        let app_handle_clone = handle.clone();
+        
+        // Start notification scheduler (15-minute intervals at :00, :15, :30, :45)
+        tokio::spawn(async move {
+            use chrono::{Local, Timelike};
+            use std::time::Duration;
+            
+            // Calculate seconds until next quarter hour
+            let seconds_until_next_quarter = || -> u64 {
+                let now = Local::now();
+                let current_minute = now.minute();
+                let current_second = now.second();
+                
+                let next_quarter = match current_minute {
+                    0..=14 => 15,
+                    15..=29 => 30,
+                    30..=44 => 45,
+                    _ => 60,  // Next hour's :00
+                };
+                
+                let minutes_to_wait = if next_quarter == 60 {
+                    60 - current_minute
+                } else {
+                    next_quarter - current_minute
+                };
+                
+                (minutes_to_wait * 60 - current_second) as u64
+            };
+            
+            // Wait until next quarter hour
+            let initial_wait = seconds_until_next_quarter();
+            log::info!("通知スケジューラー: {}秒後に開始（次の15分区切り）", initial_wait);
+            tokio::time::sleep(Duration::from_secs(initial_wait)).await;
+            
+            // Check notifications immediately at first quarter
+            log::info!("通知スケジューラー: 初回チェック実行");
+            if let Err(e) = check_and_fire_notifications(&notification_service_clone, &app_handle_clone).await {
+                log::error!("通知チェックエラー: {}", e);
+            }
+            
+            // Then check every 15 minutes
+            let mut interval = tokio::time::interval(Duration::from_secs(900));
+            interval.tick().await; // Skip first tick since we just checked
+            
+            loop {
+                interval.tick().await;
+                let now = Local::now();
+                log::info!("通知チェック定期実行: {:02}:{:02}", now.hour(), now.minute());
+                
+                if let Err(e) = check_and_fire_notifications(&notification_service_clone, &app_handle_clone).await {
+                    log::error!("通知チェックエラー: {}", e);
+                }
+            }
+        });
+        
         // Add services to app state
         handle.manage(task_service);
         handle.manage(agent_service);
@@ -149,7 +269,6 @@ pub fn run() {
       commands::task_commands::move_task,
       commands::task_commands::get_incomplete_task_count,
       commands::task_commands::update_tray_title,
-      commands::task_commands::check_notifications,
       commands::task_commands::update_task_notification_settings,
       commands::task_commands::get_children,
       commands::task_commands::get_task_with_children,
@@ -157,6 +276,7 @@ pub fn run() {
       commands::task_commands::calculate_and_update_progress,
       commands::task_commands::get_root_tasks,
       commands::task_commands::send_windows_notification,
+      commands::task_commands::force_notification_check,
       commands::task_commands::test_notification_immediate,
       commands::tag_commands::get_all_tags,
       commands::tag_commands::get_tag_by_id,

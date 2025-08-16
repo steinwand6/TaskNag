@@ -2,9 +2,10 @@ use crate::database::Database;
 use crate::error::AppError;
 use crate::models::{Task, TaskNotification};
 use crate::services::browser_action_service::BrowserActionService;
-use chrono::{DateTime, Utc, Duration, Datelike, Timelike};
+use chrono::{DateTime, Local, Duration, Datelike, Timelike};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct NotificationService {
     db: Database,
     browser_action_service: Arc<BrowserActionService>,
@@ -27,7 +28,7 @@ impl NotificationService {
     }
 
     /// 現在の通知をチェックして返すメイン関数
-    pub async fn check_notifications(&self, current_time: DateTime<Utc>) -> Result<Vec<TaskNotification>, AppError> {
+    pub async fn check_notifications(&self, current_time: DateTime<Local>) -> Result<Vec<TaskNotification>, AppError> {
         let mut notifications = Vec::new();
         
         // アクティブなタスクを取得
@@ -111,9 +112,9 @@ impl NotificationService {
     }
 
     /// 期日ベース通知のチェック
-    fn check_due_date_notification(&self, task: &Task, current_time: DateTime<Utc>) -> Option<TaskNotification> {
+    fn check_due_date_notification(&self, task: &Task, current_time: DateTime<Local>) -> Option<TaskNotification> {
         let due_date_str = task.due_date.as_ref()?;
-        let due_date = DateTime::parse_from_rfc3339(due_date_str).ok()?.with_timezone(&Utc);
+        let due_date = DateTime::parse_from_rfc3339(due_date_str).ok()?.with_timezone(&Local);
         
         let days_before = task.notification_days_before.unwrap_or(1);
         let default_time = "09:00".to_string();
@@ -133,11 +134,16 @@ impl NotificationService {
         let notification_datetime = notification_date
             .date_naive()
             .and_hms_opt(hour, minute, 0)?
-            .and_utc();
+            .and_local_timezone(Local)
+            .single()?;
         
-        // Check if it's time for notification (within 1 minute window)
-        let time_diff = (current_time - notification_datetime).num_seconds().abs();
-        if time_diff <= 60 {
+        // Check if it's time for notification (within 15 minutes after the notification time)
+        let time_diff_minutes = (current_time - notification_datetime).num_minutes();
+        log::info!("NotificationService: Checking due date notification for task '{}' - Target: {}, Current: {}, Diff: {} minutes", 
+                   task.title, notification_datetime.format("%Y-%m-%d %H:%M:%S"), current_time.format("%Y-%m-%d %H:%M:%S"), time_diff_minutes);
+        
+        // Fire notification if current time is within 15 minutes after the target time (0 to 15 minutes late)
+        if time_diff_minutes >= 0 && time_diff_minutes <= 15 {
             let days_until_due = (due_date - current_time).num_days();
             Some(TaskNotification {
                 task_id: task.id.clone(),
@@ -152,30 +158,52 @@ impl NotificationService {
     }
 
     /// 繰り返し通知のチェック
-    fn check_recurring_notification(&self, task: &Task, current_time: DateTime<Utc>) -> Option<TaskNotification> {
+    fn check_recurring_notification(&self, task: &Task, current_time: DateTime<Local>) -> Option<TaskNotification> {
         let notification_time = task.notification_time.as_ref()?;
         let days_of_week_str = task.notification_days_of_week.as_ref()?;
         
         // Parse days of week
         let days_of_week: Vec<u32> = serde_json::from_str(days_of_week_str).ok()?;
         
+        // Use local time directly (already in JST)
+        let jst_time = current_time;
+        let current_weekday = jst_time.weekday().num_days_from_monday() + 1; // Monday = 1
+        
+        log::info!("NotificationService: Checking recurring notification for task '{}' - JST: {}, Target time: {}, Days: {:?}", 
+                   task.title, jst_time.format("%Y-%m-%d %H:%M:%S"), notification_time, days_of_week);
+        
         // Check if current day is in the list
-        let current_weekday = current_time.weekday().num_days_from_monday() + 1; // Monday = 1
         if !days_of_week.contains(&current_weekday) {
+            log::info!("NotificationService: Current weekday {} not in configured days {:?}", current_weekday, days_of_week);
             return None;
         }
         
         // Parse notification time
         let time_parts: Vec<&str> = notification_time.split(':').collect();
         if time_parts.len() != 2 {
+            log::warn!("NotificationService: Invalid time format: {}", notification_time);
             return None;
         }
         
         let hour = time_parts[0].parse::<u32>().ok()?;
         let minute = time_parts[1].parse::<u32>().ok()?;
         
-        // Check if it's the right time (within 1 minute window)
-        if current_time.hour() == hour && current_time.minute() == minute {
+        // Check if it's the right time (within 15 minutes after the target time)
+        let target_minutes = hour * 60 + minute;
+        let current_minutes = jst_time.hour() * 60 + jst_time.minute();
+        
+        // Fire notification if target time is within the previous 15 minutes (16-30 handles 16-30 minute notifications)
+        let time_diff_after = if current_minutes >= target_minutes {
+            current_minutes - target_minutes
+        } else {
+            // Handle day rollover (e.g., target 23:30, current 00:15)
+            (24 * 60 + current_minutes) - target_minutes
+        };
+        
+        if time_diff_after <= 15 {
+            log::info!("NotificationService: ✅ Firing recurring notification for task '{}' (target: {}:{:02}, current: {}:{:02}, diff: {} minutes)", 
+                      task.title, hour, minute, jst_time.hour(), jst_time.minute(), time_diff_after);
+            
             Some(TaskNotification {
                 task_id: task.id.clone(),
                 title: task.title.clone(),
@@ -184,6 +212,8 @@ impl NotificationService {
                 days_until_due: None,
             })
         } else {
+            log::info!("NotificationService: Time window missed for task '{}' (target: {}:{:02}, current: {}:{:02}, diff: {} minutes)", 
+                      task.title, hour, minute, jst_time.hour(), jst_time.minute(), time_diff_after);
             None
         }
     }

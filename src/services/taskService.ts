@@ -44,9 +44,6 @@ export class TaskService {
     return await invoke('update_tray_title');
   }
 
-  static async checkNotifications(): Promise<TaskNotification[]> {
-    return await invoke('check_notifications');
-  }
 
   static async updateTaskNotificationSettings(
     id: string, 

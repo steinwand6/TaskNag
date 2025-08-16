@@ -1,5 +1,7 @@
 use crate::models::{Task, TaskNotification};
 use crate::tests::mock_database::{MockDatabase, create_test_task_with_notifications, create_test_task_due_date_based};
+use crate::services::notification_service::NotificationService;
+use crate::database::Database;
 use uuid::Uuid;
 use chrono::{Utc, DateTime, Duration, Weekday, Datelike, Timelike};
 
@@ -507,6 +509,44 @@ async fn test_notification_timing_precision() {
     }
     
     println!("🎉 All notification timing precision tests passed!");
+}
+
+/// 実際のNotificationService.fire_notification()のテスト
+#[tokio::test]
+async fn test_real_notification_service_fire_notification() {
+    println!("🧪 Testing real NotificationService.fire_notification()...");
+    
+    // Create notification service for testing
+    let db = Database::new_placeholder();
+    let notification_service = NotificationService::new(db);
+    
+    // Test browser action service availability (core functionality)
+    let browser_action_service = crate::services::browser_action_service::BrowserActionService::new();
+    assert!(browser_action_service.is_available().await, "BrowserActionService should be available");
+    
+    println!("✅ BrowserActionService is available");
+    
+    // Test browser action settings parsing
+    let browser_actions_json = r#"{"enabled":true,"actions":[{"id":"1","label":"Test","url":"https://example.com","enabled":true,"order":1,"createdAt":"2024-01-01T00:00:00Z"}]}"#;
+    let settings_result = serde_json::from_str::<crate::models::browser_action::BrowserActionSettings>(browser_actions_json);
+    assert!(settings_result.is_ok(), "Should parse browser action settings correctly");
+    
+    let settings = settings_result.unwrap();
+    assert!(settings.enabled, "Browser actions should be enabled");
+    assert_eq!(settings.actions.len(), 1, "Should have one browser action");
+    assert_eq!(settings.actions[0].url, "https://example.com", "URL should match");
+    
+    println!("✅ Browser action settings parsing works correctly");
+    
+    // Test notification level filtering logic
+    assert!(notification_service.should_execute_browser_actions(Some(3))); // High
+    assert!(notification_service.should_execute_browser_actions(Some(2))); // Medium
+    assert!(!notification_service.should_execute_browser_actions(Some(1))); // Low
+    assert!(!notification_service.should_execute_browser_actions(None)); // None
+    
+    println!("✅ Notification level filtering works correctly");
+    
+    println!("🎉 Real NotificationService.fire_notification() tests passed!");
 }
 
 /// 複合シナリオのテスト

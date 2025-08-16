@@ -1,6 +1,6 @@
 use crate::models::{CreateTaskRequest, Task, UpdateTaskRequest};
-use crate::services::TaskService;
-use tauri::{AppHandle, State, Emitter, Manager};
+use crate::services::{TaskService, NotificationService};
+use tauri::{AppHandle, State, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 #[tauri::command]
@@ -109,50 +109,6 @@ pub async fn update_tray_title(
     Ok(())
 }
 
-#[tauri::command]
-pub async fn check_notifications(
-    app: AppHandle,
-    service: State<'_, TaskService>,
-) -> Result<Vec<serde_json::Value>, String> {
-    let notifications = service.check_notifications().await.map_err(|e| e.to_string())?;
-    let mut result = Vec::new();
-    
-    for notification in notifications {
-        // 通知レベルに応じて通知を送信
-        let title = match notification.notification_type.as_str() {
-            "due_date_based" => {
-                let days_text = match notification.days_until_due.unwrap_or(0) {
-                    0 => "【期限当日】",
-                    1 => "【期限明日】",
-                    d if d <= 3 => "【期限間近】",
-                    _ => "【期限通知】",
-                };
-                format!("📅 {}", days_text)
-            },
-            "recurring" => "🔔 定期リマインド".to_string(),
-            _ => "📋 タスク通知".to_string()
-        };
-        
-        // Windows通知を送信
-        send_windows_notification(
-            app.clone(),
-            title,
-            notification.title.clone(),
-            notification.level as u32,
-        ).await?;
-        
-        // 通知情報を記録
-        result.push(serde_json::json!({
-            "taskId": notification.task_id,
-            "title": notification.title,
-            "level": notification.level,
-            "daysUntilDue": notification.days_until_due,
-            "notificationType": notification.notification_type
-        }));
-    }
-    
-    Ok(result)
-}
 
 #[tauri::command]
 pub async fn update_task_notification_settings(
@@ -234,18 +190,34 @@ pub async fn send_windows_notification(
     body: String,
     level: u32,
 ) -> Result<(), String> {
-    // Windows通知を送信
-    app.notification()
-        .builder()
-        .title(&title)
-        .body(&body)
-        .show()
-        .map_err(|e| e.to_string())?;
-    
-    // レベル2以上で音を鳴らす
-    if level >= 2 {
-        let _ = app.emit("play_notification_sound", serde_json::json!({ "level": level }));
+    // Windows通知を送信（音声付き）
+    #[cfg(target_os = "windows")]
+    {
+        app.notification()
+            .builder()
+            .title(&title)
+            .body(&body)
+            .sound("Default")  // Windows specific sound name
+            .show()
+            .map_err(|e| e.to_string())?;
     }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        app.notification()
+            .builder()
+            .title(&title)
+            .body(&body)
+            .sound("default")
+            .show()
+            .map_err(|e| e.to_string())?;
+    }
+    
+    // レベル2以上で追加の音を鳴らす場合のみ（オプショナル）
+    // 通常はWindows通知音で十分なのでコメントアウト
+    // if level >= 2 {
+    //     let _ = app.emit("play_notification_sound", serde_json::json!({ "level": level, "useCustomSound": true }));
+    // }
     
     // レベル3でアプリを最大化
     if level >= 3 {
@@ -260,15 +232,86 @@ pub async fn send_windows_notification(
 }
 
 #[tauri::command]
+pub async fn force_notification_check(
+    app: AppHandle,
+    service: State<'_, NotificationService>,
+) -> Result<Vec<serde_json::Value>, String> {
+    use chrono::Local;
+    
+    log::info!("手動通知チェック実行");
+    
+    let current_time = Local::now();
+    let notifications = service.check_notifications(current_time).await.map_err(|e| e.to_string())?;
+    
+    let mut result = Vec::new();
+    
+    if notifications.is_empty() {
+        log::info!("発火条件を満たす通知はありません");
+    } else {
+        log::info!("{}件の通知が発火条件を満たしています", notifications.len());
+        
+        for notification in notifications {
+            // Fire the notification
+            service.fire_notification(&notification).await.map_err(|e| e.to_string())?;
+            
+            // Send Windows notification
+            let title = match notification.notification_type.as_str() {
+                "due_date_based" => "📅 期日通知",
+                "recurring" => "🔔 定期通知",
+                _ => "📋 通知",
+            };
+            
+            #[cfg(target_os = "windows")]
+            {
+                app.notification()
+                    .builder()
+                    .title(title)
+                    .body(&notification.title)
+                    .sound("Default")  // Windows specific sound name
+                    .show()
+                    .map_err(|e| e.to_string())?;
+            }
+            
+            #[cfg(not(target_os = "windows"))]
+            {
+                app.notification()
+                    .builder()
+                    .title(title)
+                    .body(&notification.title)
+                    .sound("default")
+                    .show()
+                    .map_err(|e| e.to_string())?;
+            }
+            
+            // Level 3: maximize window
+            if notification.level >= 3 {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+            }
+            
+            result.push(serde_json::json!({
+                "taskId": notification.task_id,
+                "title": notification.title,
+                "level": notification.level,
+                "notificationType": notification.notification_type,
+                "triggered": true
+            }));
+        }
+    }
+    
+    Ok(result)
+}
+
+#[tauri::command]
 pub async fn test_notification_immediate(
     app: AppHandle,
     service: State<'_, TaskService>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    // 現在の通知設定を持つタスクをすべて取得して即座に通知を送信
-    let _notifications = service.check_notifications().await.map_err(|e| e.to_string())?;
-    let mut result = Vec::new();
-    
     // 通知チェックロジックを無視して、設定のあるすべてのタスクを通知
+    let mut result = Vec::new();
     let all_tasks = service.get_tasks().await.map_err(|e| e.to_string())?;
     
     for task in all_tasks {
